@@ -19,7 +19,7 @@ SlidingMoments::SlidingMoments(std::size_t window_size)
     inv_[j] = 1.0 / static_cast<double>(j);
 }
 
-static inline void
+[[gnu::always_inline]] static inline void
 moments_add(double x, std::size_t &cnt, double &mean, double &M2, double &M3,
             double &M4, const double *inv) {
   ++cnt;
@@ -34,7 +34,7 @@ moments_add(double x, std::size_t &cnt, double &mean, double &M2, double &M3,
   mean += dn;
 }
 
-static inline void
+[[gnu::always_inline]] static inline void
 moments_remove(double x_out, std::size_t &cnt, double &mean, double &M2,
                double &M3, double &M4, const double *inv) {
   if (cnt == 1) {
@@ -57,7 +57,7 @@ moments_remove(double x_out, std::size_t &cnt, double &mean, double &M2,
   --cnt;
 }
 
-static inline void
+[[gnu::always_inline]] static inline void
 moments_add_3(double x, std::size_t &cnt, double &mean, double &M2, double &M3,
               const double *inv) {
   ++cnt;
@@ -70,7 +70,7 @@ moments_add_3(double x, std::size_t &cnt, double &mean, double &M2, double &M3,
   mean += dn;
 }
 
-static inline void
+[[gnu::always_inline]] static inline void
 moments_remove_3(double x_out, std::size_t &cnt, double &mean, double &M2,
                  double &M3, const double *inv) {
   if (cnt == 1) {
@@ -151,9 +151,9 @@ void SlidingMoments::update_skewness_only(double value) {
     moments_add_3(value, count_, mean_, M2_, M3_, inv_.data());
 }
 
-void SlidingMoments::process_skewness_batch(const double *in,
+void SlidingMoments::process_skewness_batch(const double *__restrict__ in,
                                             std::size_t n,
-                                            double *out,
+                                            double *__restrict__ out,
                                             std::size_t min_periods) {
   const std::size_t k = window_size_;
   const double ck = static_cast<double>(k);
@@ -162,7 +162,7 @@ void SlidingMoments::process_skewness_batch(const double *in,
   // Precomputed skewness scale for the steady-state (count_ == k) case:
   // get_skewness = M3_ * ck * sqrt(ck-1) / (M2_ * sqrt(M2_) * (ck-2))
   const double skew_scale =
-      (k >= 3) ? ck * std::sqrt(ck - 1.0) / (ck - 2.0) : kNaN;
+      (k >= 3) ? ck * std::sqrt(ck - 1.0) / (ck - 2.0) : 0.0;
 
   std::size_t i = 0;
   for (; i < n && n_written_ < k; ++i) {
@@ -182,15 +182,15 @@ void SlidingMoments::process_skewness_batch(const double *in,
     if (++head_ == k)
       head_ = 0;
 
-    if (!std::isnan(x_out))
+    if (__builtin_expect(!std::isnan(x_out), 1))
       moments_remove_3(x_out, count_, mean_, M2_, M3_, iv);
 
-    if (!std::isnan(x_in))
+    if (__builtin_expect(!std::isnan(x_in), 1))
       moments_add_3(x_in, count_, mean_, M2_, M3_, iv);
 
-    if (count_ < min_periods) {
+    if (__builtin_expect(count_ < min_periods, 0)) {
       out[i] = kNaN;
-    } else if (count_ == k) {
+    } else if (__builtin_expect(count_ == k, 1)) {
       out[i] = M2_ > 0.0 ? M3_ * skew_scale / (M2_ * std::sqrt(M2_)) : kNaN;
     } else {
       out[i] = get_skewness();
@@ -198,9 +198,9 @@ void SlidingMoments::process_skewness_batch(const double *in,
   }
 }
 
-void SlidingMoments::process_kurtosis_batch(const double *in,
+void SlidingMoments::process_kurtosis_batch(const double *__restrict__ in,
                                             std::size_t n,
-                                            double *out,
+                                            double *__restrict__ out,
                                             std::size_t min_periods) {
   const std::size_t k = window_size_;
   const double ck = static_cast<double>(k);
@@ -211,7 +211,7 @@ void SlidingMoments::process_kurtosis_batch(const double *in,
   // where g2 = M4_*n/(M2_*M2_) - 3
   // We precompute the outer coefficient and the (n+1)/((n-2)*(n-3)) part.
   const double kurt_outer =
-      (k >= 4) ? (ck - 1.0) / ((ck - 2.0) * (ck - 3.0)) : kNaN;
+      (k >= 4) ? (ck - 1.0) / ((ck - 2.0) * (ck - 3.0)) : 0.0;
   const double kurt_n1 = ck + 1.0;
   const double kurt_n_inv =
       ck; // multiplier for M4_/(M2_*M2_): ck*kurt_outer*(n+1)
@@ -234,15 +234,15 @@ void SlidingMoments::process_kurtosis_batch(const double *in,
     if (++head_ == k)
       head_ = 0;
 
-    if (!std::isnan(x_out))
+    if (__builtin_expect(!std::isnan(x_out), 1))
       moments_remove(x_out, count_, mean_, M2_, M3_, M4_, iv);
 
-    if (!std::isnan(x_in))
+    if (__builtin_expect(!std::isnan(x_in), 1))
       moments_add(x_in, count_, mean_, M2_, M3_, M4_, iv);
 
-    if (count_ < min_periods) {
+    if (__builtin_expect(count_ < min_periods, 0)) {
       out[i] = kNaN;
-    } else if (count_ == k) {
+    } else if (__builtin_expect(count_ == k, 1)) {
       if (M2_ <= 0.0) {
         out[i] = kNaN;
         continue;
