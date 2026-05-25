@@ -61,3 +61,29 @@ TEST(SlidingWelfordRingTest, CrtpInterfaceMatchesVariance) {
   EXPECT_EQ(base.current_size(), 2U);
   EXPECT_DOUBLE_EQ(base.get_value(), sw.get_variance());
 }
+
+TEST(SlidingWelfordRingTest, NanDoesNotContributeToWindow) {
+  // window=3, sequence [10, 20, skip, 30]:
+  // after skip:    valid=[10,20], mean=15, var=50, size=2
+  // after update(30): 10 expires -> valid=[20,30], mean=25, var=50, size=2
+  SlidingWelfordRing sw(3);
+
+  sw.update(10.0);
+  EXPECT_DOUBLE_EQ(sw.get_mean(), 10.0);
+  EXPECT_EQ(sw.current_size(), 1U);
+
+  sw.update(20.0);
+  EXPECT_DOUBLE_EQ(sw.get_mean(), 15.0);
+  EXPECT_DOUBLE_EQ(sw.get_variance(), 50.0);
+  EXPECT_EQ(sw.current_size(), 2U);
+
+  sw.skip();
+  EXPECT_DOUBLE_EQ(sw.get_mean(), 15.0);
+  EXPECT_DOUBLE_EQ(sw.get_variance(), 50.0);
+  EXPECT_EQ(sw.current_size(), 2U);
+
+  sw.update(30.0);
+  EXPECT_DOUBLE_EQ(sw.get_mean(), 25.0);
+  EXPECT_DOUBLE_EQ(sw.get_variance(), 50.0);
+  EXPECT_EQ(sw.current_size(), 2U);
+}

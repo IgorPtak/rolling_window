@@ -65,3 +65,27 @@ TEST(SlidingMomentsTest, NanDoesNotCorruptMathematicalState) {
   sm.update(30.0);
   EXPECT_NEAR(sm.get_skewness(), skew_before, 1e-10);
 }
+
+TEST(SlidingMomentsTest, SmallWindowSkewnessAlwaysNaN) {
+  // window=2 -> at most 2 values -> skewness (needs >=3) always NaN
+  SlidingMoments sm(2);
+  sm.update(1.0);
+  sm.update(2.0);
+  EXPECT_EQ(sm.current_size(), 2U);
+  EXPECT_TRUE(std::isnan(sm.get_skewness()));
+  EXPECT_TRUE(std::isnan(sm.get_kurtosis()));
+
+  sm.update(3.0); // window slides to [2, 3], size still 2
+  EXPECT_EQ(sm.current_size(), 2U);
+  EXPECT_TRUE(std::isnan(sm.get_skewness()));
+  EXPECT_TRUE(std::isnan(sm.get_kurtosis()));
+}
+
+TEST(SlidingMomentsTest, WindowSize1BothMomentsAlwaysNaN) {
+  // window=1 -> size always <=1 -> both moments always NaN
+  SlidingMoments sm(1);
+  sm.update(5.0);
+  EXPECT_EQ(sm.current_size(), 1U);
+  EXPECT_TRUE(std::isnan(sm.get_skewness()));
+  EXPECT_TRUE(std::isnan(sm.get_kurtosis()));
+}

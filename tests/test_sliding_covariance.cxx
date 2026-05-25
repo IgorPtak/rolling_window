@@ -51,3 +51,24 @@ TEST(SlidingCovarianceTest, NanPairSkipped) {
   EXPECT_NEAR(sc.get_covariance(), 1.0, 1e-12);
   EXPECT_NEAR(sc.get_correlation(), 1.0, 1e-12);
 }
+
+TEST(SlidingCovarianceTest, SinglePairCovarianceIsNaN) {
+  SlidingCovariance sc(3);
+  sc.update(1.0, 2.0);
+  EXPECT_TRUE(std::isnan(sc.get_covariance()));
+  EXPECT_TRUE(std::isnan(sc.get_correlation()));
+  EXPECT_EQ(sc.current_size(), 1);
+}
+
+TEST(SlidingCovarianceTest, ConstantXCorrelationIsNaN) {
+  // x is constant -> std_dev(x) = 0 -> correlation = cov / (0 * sd_y) = NaN
+  // covariance itself is 0 (x never deviates from its mean)
+  SlidingCovariance sc(4);
+  sc.update(5.0, 1.0);
+  sc.update(5.0, 2.0);
+  sc.update(5.0, 3.0);
+  sc.update(5.0, 4.0);
+  EXPECT_TRUE(std::isnan(sc.get_correlation()));
+  EXPECT_NEAR(sc.get_covariance(), 0.0, 1e-12);
+  EXPECT_NEAR(sc.get_mean_x(), 5.0, 1e-12);
+}
