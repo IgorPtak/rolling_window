@@ -70,6 +70,26 @@ run_vs_libs <- function(n) {
   do.call(rbind, rows)
 }
 
+run_unique_metrics <- function(n) {
+  x <- as.double(rnorm(n))
+  y <- as.double(rnorm(n))
+  w <- WINDOW
+
+  cases <- list(
+    rolling_skewness = list(robustrolling = function() rolling_skewness(x, w)),
+    rolling_kurtosis = list(robustrolling = function() rolling_kurtosis(x, w)),
+    rolling_cov      = list(robustrolling = function() rolling_cov(x, y, w)),
+    rolling_cor      = list(robustrolling = function() rolling_cor(x, y, w))
+  )
+
+  rows <- lapply(names(cases), function(nm) {
+    meds <- med_ms(cases[[nm]])
+    data.frame(name = nm, our_ms = meds[["robustrolling"]],
+               stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows)
+}
+
 run_stable_vs_fast <- function(n) {
   x <- as.double(rnorm(n))
   w <- WINDOW
@@ -125,6 +145,17 @@ print_vs_libs <- function(n, df) {
   }
 }
 
+print_unique_metrics <- function(n, df) {
+  cat(sprintf("\n  n = %s   window = %d   (median of %d runs)\n",
+              fmt_n(n), WINDOW, REPS))
+  cat(sprintf("  %-20s %14s\n", "Function", "robustrolling"))
+  cat("  ", strrep("-", 36), "\n", sep = "")
+  for (i in seq_len(nrow(df))) {
+    r <- df[i, ]
+    cat(sprintf("  %-20s %10.2f ms\n", r$name, r$our_ms))
+  }
+}
+
 print_stable_vs_fast <- function(n, df) {
   cat(sprintf("\n  n = %s   window = %d   (median of %d runs)\n",
               fmt_n(n), WINDOW, REPS))
@@ -143,6 +174,13 @@ cat(strrep("=", 80), "\n")
 for (n in SIZES) {
   df <- run_vs_libs(n)
   print_vs_libs(n, df)
+}
+
+cat("\n\nunique metrics (no slider/RcppRoll equivalent)\n")
+cat(strrep("=", 80), "\n")
+for (n in SIZES) {
+  df <- run_unique_metrics(n)
+  print_unique_metrics(n, df)
 }
 
 cat("\n\nstable vs fast — prefix-sum acceleration\n")

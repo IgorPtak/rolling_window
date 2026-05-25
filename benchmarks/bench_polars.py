@@ -1,5 +1,5 @@
 """
-Benchmark: robustrolling vs Polars rolling functions + stable vs fast.
+Benchmark: robustrolling vs Polars rolling functions (stable methods only).
 
 Usage:
     pip install polars
@@ -20,6 +20,7 @@ REPS = 10
 
 def bench(fn, reps: int = REPS) -> float:
     """Return median wall time in milliseconds over `reps` runs."""
+    fn()  # warmup: prime caches before timing
     times = []
     for _ in range(reps):
         t0 = time.perf_counter()
@@ -30,14 +31,11 @@ def bench(fn, reps: int = REPS) -> float:
 
 def make_data(n: int):
     x = RNG.standard_normal(n)
-    y = RNG.standard_normal(n)
-    sx = pl.Series(x)
-    sy = pl.Series(y)
-    return x, y, sx, sy
+    return x, pl.Series(x)
 
 
 def run_vs_polars(n: int) -> list[dict]:
-    x, y, sx, sy = make_data(n)
+    x, sx = make_data(n)
     w = WINDOW
 
     cases = [
@@ -59,31 +57,11 @@ def run_vs_polars(n: int) -> list[dict]:
     return results
 
 
-def run_fast_vs_polars(n: int) -> list[dict]:
-    x, _y, sx, _sy = make_data(n)
-    w = WINDOW
-
-    cases = [
-        ("rolling_mean (SIMD)",       lambda: rr.rolling_mean(x, w, assume_finite=True), lambda: sx.rolling_mean(w)),
-        ("rolling_variance (fast)",   lambda: rr.rolling_variance(x, w, method="fast"),  lambda: sx.rolling_var(w)),
-        ("rolling_skewness (fast)",   lambda: rr.rolling_skewness(x, w, method="fast"),  lambda: sx.rolling_skew(w)),
-        ("rolling_kurtosis (fast)",   lambda: rr.rolling_kurtosis(x, w, method="fast"),  lambda: sx.rolling_kurtosis(w)),
-    ]
-
-    results = []
-    for name, our_fn, pl_fn in cases:
-        our_ms = bench(our_fn)
-        pl_ms = bench(pl_fn)
-        results.append({"name": name, "our_ms": our_ms, "pl_ms": pl_ms,
-                        "speedup": pl_ms / our_ms})
-    return results
-
-
 def flag(v: float) -> str:
     return "x" if v >= 1.0 else " "
 
 
-def print_table(n: int, rows: list[dict], label: str) -> None:
+def print_table(n: int, rows: list[dict]) -> None:
     print(f"\n  n = {n:,}   window = {WINDOW}   (median of {REPS} runs)")
     print(f"  {'Function':<28} {'robustrolling':>14} {'polars':>10} {'speedup':>9}")
     print("  " + "-" * 65)
@@ -98,15 +76,8 @@ def print_table(n: int, rows: list[dict], label: str) -> None:
 if __name__ == "__main__":
     print(f"robustrolling vs Polars {pl.__version__} — rolling window benchmark")
     print("=" * 65)
-
-    print("\n--- stable (default) methods vs Polars ---")
     for n in SIZES:
         rows = run_vs_polars(n)
-        print_table(n, rows, "stable")
-
-    print("\n\n--- fast methods vs Polars ---")
-    for n in SIZES:
-        rows = run_fast_vs_polars(n)
-        print_table(n, rows, "fast")
+        print_table(n, rows)
 
     print()
