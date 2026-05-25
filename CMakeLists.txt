@@ -5,7 +5,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -O3")
+if(NOT MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -O3")
+endif()
 
 add_library(rolling_core
     src_core/MultisetMedian.cpp
@@ -19,31 +21,34 @@ add_library(rolling_core
 )
 target_include_directories(rolling_core PUBLIC include)
 
-# R integration for wrapper sources (headers, compiler flags and linker flags).
-find_program(R_EXECUTABLE NAMES R REQUIRED)
+option(BUILD_R_WRAPPER "Build R wrapper shared library" ON)
 
-execute_process(
-    COMMAND ${R_EXECUTABLE} CMD config --cppflags
-    OUTPUT_VARIABLE R_CPPFLAGS_RAW
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+if(BUILD_R_WRAPPER)
+  find_program(R_EXECUTABLE NAMES R REQUIRED)
 
-execute_process(
-    COMMAND ${R_EXECUTABLE} CMD config --ldflags
-    OUTPUT_VARIABLE R_LDFLAGS_RAW
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
+  execute_process(
+      COMMAND ${R_EXECUTABLE} CMD config --cppflags
+      OUTPUT_VARIABLE R_CPPFLAGS_RAW
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
 
-separate_arguments(R_CPPFLAGS NATIVE_COMMAND "${R_CPPFLAGS_RAW}")
-separate_arguments(R_LDFLAGS NATIVE_COMMAND "${R_LDFLAGS_RAW}")
+  execute_process(
+      COMMAND ${R_EXECUTABLE} CMD config --ldflags
+      OUTPUT_VARIABLE R_LDFLAGS_RAW
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
 
-add_library(rolling_r_wrapper SHARED
-    src/r_wrapper.cpp
-)
-target_include_directories(rolling_r_wrapper PRIVATE include)
-target_link_libraries(rolling_r_wrapper PRIVATE rolling_core)
-target_compile_options(rolling_r_wrapper PRIVATE ${R_CPPFLAGS})
-target_link_options(rolling_r_wrapper PRIVATE ${R_LDFLAGS})
+  separate_arguments(R_CPPFLAGS NATIVE_COMMAND "${R_CPPFLAGS_RAW}")
+  separate_arguments(R_LDFLAGS NATIVE_COMMAND "${R_LDFLAGS_RAW}")
+
+  add_library(rolling_r_wrapper SHARED
+      src/r_wrapper.cpp
+  )
+  target_include_directories(rolling_r_wrapper PRIVATE include)
+  target_link_libraries(rolling_r_wrapper PRIVATE rolling_core)
+  target_compile_options(rolling_r_wrapper PRIVATE ${R_CPPFLAGS})
+  target_link_options(rolling_r_wrapper PRIVATE ${R_LDFLAGS})
+endif()
 
 include(FetchContent)
 
