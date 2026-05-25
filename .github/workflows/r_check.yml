@@ -1,6 +1,7 @@
 name: R package check
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - R/**
