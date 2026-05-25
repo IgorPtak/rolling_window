@@ -61,3 +61,40 @@ TEST(MonotonicMaxTest, CrtpInterfaceMatchesMax) {
   EXPECT_EQ(base.current_size(), 3U);
   EXPECT_DOUBLE_EQ(base.get_value(), mm.get_max());
 }
+
+TEST(MonotonicMaxTest, InitialStateIsNaN) {
+  MonotonicMax mm(3);
+  EXPECT_TRUE(std::isnan(mm.get_max()));
+  EXPECT_EQ(mm.current_size(), 0);
+}
+
+TEST(MonotonicMaxTest, WindowSize1Identity) {
+  MonotonicMax mm(1);
+  mm.update(5.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 5.0);
+  mm.update(3.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 3.0);
+  mm.update(8.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 8.0);
+  mm.update(1.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 1.0);
+}
+
+TEST(MonotonicMaxTest, NanDoesNotContributeToWindow) {
+  MonotonicMax mm(2);
+  mm.update(1.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 1.0);
+  mm.update(2.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 2.0);
+  mm.skip();
+  EXPECT_DOUBLE_EQ(mm.get_max(), 2.0);
+  mm.update(1.0);
+  EXPECT_DOUBLE_EQ(mm.get_max(), 1.0);
+}
+
+TEST(MonotonicMaxTest, NanAtStartReturnsNan) {
+  MonotonicMax mm(3);
+  mm.skip();
+  EXPECT_TRUE(std::isnan(mm.get_max()));
+  EXPECT_EQ(mm.current_size(), 0);
+}

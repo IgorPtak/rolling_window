@@ -1,5 +1,6 @@
 #include "MultisetMedian.hpp"
 
+#include <cmath>
 #include <gtest/gtest.h>
 
 TEST(MultisetMedianTest, HandlesInitialization) {
@@ -77,4 +78,36 @@ TEST(MultisetMedianTest, HandlesWindowSize2Sliding) {
   EXPECT_DOUBLE_EQ(sm.get_median(), 1.5);
   sm.update(3.0);
   EXPECT_DOUBLE_EQ(sm.get_median(), 2.5);
+}
+
+TEST(MultisetMedianTest, WindowSize1Identity) {
+  MultisetMedian sm(1);
+  sm.update(5.0);
+  EXPECT_DOUBLE_EQ(sm.get_median(), 5.0);
+  sm.update(3.0);
+  EXPECT_DOUBLE_EQ(sm.get_median(), 3.0);
+  sm.update(8.0);
+  EXPECT_DOUBLE_EQ(sm.get_median(), 8.0);
+}
+
+TEST(MultisetMedianTest, NanDoesNotContributeToWindow) {
+  // window=3, sequence [1, 2, skip, 4]:
+  // after skip:     window=[1,2,NaN] -> valid=[1,2], median=1.5
+  // after update(4): window=[2,NaN,4] -> valid=[2,4], median=3.0
+  MultisetMedian sm(3);
+  sm.update(1.0);
+  EXPECT_DOUBLE_EQ(sm.get_median(), 1.0);
+  EXPECT_EQ(sm.current_size(), 1U);
+
+  sm.update(2.0);
+  EXPECT_DOUBLE_EQ(sm.get_median(), 1.5);
+  EXPECT_EQ(sm.current_size(), 2U);
+
+  sm.skip();
+  EXPECT_DOUBLE_EQ(sm.get_median(), 1.5);
+  EXPECT_EQ(sm.current_size(), 2U);
+
+  sm.update(4.0);
+  EXPECT_DOUBLE_EQ(sm.get_median(), 3.0);
+  EXPECT_EQ(sm.current_size(), 2U);
 }

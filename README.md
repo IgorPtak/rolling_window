@@ -281,47 +281,57 @@ Benchmarked on Apple M-series (ARM), window = 100, n = 1 000 000.
 
 ### Python vs pandas
 
-Best robustrolling configuration vs pandas (¹ `assume_finite=True`, ² `method="fast"`).
+| Function             | robustrolling | pandas   | speedup  |
+| -------------------- | ------------- | -------- | -------- |
+| `rolling_mean`       | 3.1 ms        | 4.4 ms   | **1.4x** |
+| `rolling_max`        | 11.1 ms       | 11.7 ms  | 1.1x     |
+| `rolling_min`        | 11.2 ms       | 12.2 ms  | 1.1x     |
+| `rolling_median`     | 106 ms        | 233 ms   | **2.2x** |
+| `rolling_variance`   | 15.2 ms       | 9.6 ms   | 0.6x     |
+| `rolling_skewness`   | 14.0 ms       | 9.1 ms   | 0.6x     |
+| `rolling_kurtosis`   | 14.3 ms       | 9.2 ms   | 0.6x     |
+| `rolling_cov`        | 14.8 ms       | 18.2 ms  | **1.2x** |
+| `rolling_cor`        | 14.6 ms       | 36.7 ms  | **2.5x** |
 
-| Function                 | robustrolling | pandas    | speedup   |
-| ------------------------ | ------------- | --------- | --------- |
-| `rolling_mean` ¹         | 0.78 ms       | 4.58 ms   | **5.9x**  |
-| `rolling_max`            | 11.5 ms       | 12.3 ms   | 1.1x      |
-| `rolling_min`            | 11.5 ms       | 12.7 ms   | 1.1x      |
-| `rolling_median`         | 111 ms        | 233 ms    | **2.1x**  |
-| `rolling_variance` ²     | 4.4 ms        | 10.6 ms   | **2.4x**  |
-| `rolling_skewness` ²     | 10.9 ms       | 10.1 ms   | ~1.0x     |
-| `rolling_kurtosis` ²     | 8.4 ms        | 10.0 ms   | 1.2x      |
-| `rolling_cov`            | 16.8 ms       | 19.3 ms   | 1.2x      |
-| `rolling_cor`            | 16.8 ms       | 39.6 ms   | **2.4x**  |
+### Python vs Polars
+
+| Function             | robustrolling | Polars   | speedup  |
+| -------------------- | ------------- | -------- | -------- |
+| `rolling_mean`       | 3.1 ms        | 8.0 ms   | **2.6x** |
+| `rolling_max`        | 11.1 ms       | 11.4 ms  | 1.0x     |
+| `rolling_min`        | 11.0 ms       | 11.6 ms  | 1.1x     |
+| `rolling_median`     | 106 ms        | 40.8 ms  | 0.4x     |
+| `rolling_variance`   | 15.7 ms       | 16.2 ms  | 1.0x     |
+| `rolling_skewness`   | 13.9 ms       | 16.0 ms  | **1.2x** |
+| `rolling_kurtosis`   | 14.3 ms       | 15.6 ms  | 1.1x     |
 
 ### Python — stable vs fast
 
 | Function               | stable   | fast     | speedup  |
 | ---------------------- | -------- | -------- | -------- |
-| `mean` (assume_finite) | 3.5 ms   | 0.78 ms  | **4.4x** |
-| `variance`             | 16.1 ms  | 4.4 ms   | **3.7x** |
-| `skewness`             | 23.9 ms  | 10.9 ms  | **2.2x** |
-| `kurtosis`             | 21.7 ms  | 8.4 ms   | **2.6x** |
+| `mean` (assume_finite) | 3.2 ms   | 0.73 ms  | **4.4x** |
+| `variance`             | 15.2 ms  | 3.9 ms   | **3.9x** |
+| `skewness`             | 13.9 ms  | 10.0 ms  | **1.4x** |
+| `kurtosis`             | 14.4 ms  | 7.6 ms   | **1.9x** |
 
 ### R vs slider vs RcppRoll
 
 | Function             | robustrolling | slider     | RcppRoll  | vs slider  | vs RcppRoll |
 | -------------------- | ------------- | ---------- | --------- | ---------- | ----------- |
-| `rolling_max`        | 15.9 ms       | 349 ms     | 181 ms    | **22x**    | **11x**     |
-| `rolling_min`        | 15.2 ms       | 353 ms     | 181 ms    | **23x**    | **12x**     |
-| `rolling_mean`       | 3.2 ms        | 1 558 ms   | 39.0 ms   | **495x**   | **12x**     |
-| `rolling_variance`   | 16.9 ms       | 2 578 ms   | 320 ms    | **152x**   | **19x**     |
-| `rolling_median`     | 114 ms        | 10 254 ms  | 2 014 ms  | **90x**    | **18x**     |
+| `rolling_max`        | 15.1 ms       | 338 ms     | 175 ms    | **22x**    | **12x**     |
+| `rolling_min`        | 14.9 ms       | 350 ms     | 175 ms    | **24x**    | **12x**     |
+| `rolling_mean`       | 3.1 ms        | 1 523 ms   | 37.4 ms   | **487x**   | **12x**     |
+| `rolling_variance`   | 16.0 ms       | 2 477 ms   | 304 ms    | **154x**   | **19x**     |
+| `rolling_median`     | 112 ms        | 10 084 ms  | 1 938 ms  | **90x**    | **17x**     |
 
 ### R — stable vs fast
 
 | Function               | stable   | fast     | speedup  |
 | ---------------------- | -------- | -------- | -------- |
-| `mean` (assume_finite) | 3.3 ms   | 0.80 ms  | **4.2x** |
-| `variance`             | 16.8 ms  | 4.4 ms   | **3.9x** |
-| `skewness`             | 21.9 ms  | 10.6 ms  | **2.1x** |
-| `kurtosis`             | 21.6 ms  | 8.3 ms   | **2.6x** |
+| `mean` (assume_finite) | 3.2 ms   | 0.78 ms  | **4.0x** |
+| `variance`             | 16.2 ms  | 4.1 ms   | **4.0x** |
+| `skewness`             | 14.5 ms  | 10.3 ms  | **1.4x** |
+| `kurtosis`             | 14.4 ms  | 7.8 ms   | **1.8x** |
 
 ---
 

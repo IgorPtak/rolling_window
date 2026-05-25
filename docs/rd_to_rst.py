@@ -96,52 +96,45 @@ def _extract_items(content: str, tag: str) -> list[tuple[str, str]]:
     return items
 
 
+def _indent(text: str, prefix: str) -> str:
+    """Indent every line of text with prefix."""
+    lines = text.splitlines()
+    return "\n".join(prefix + l if l.strip() else "" for l in lines)
+
+
 def rd_to_rst(rd_path: Path) -> str:
     content = rd_path.read_text(encoding="utf-8")
 
     title = _strip_rd(_extract(content, "title"))
     description = _strip_rd(_extract(content, "description"))
-    usage = _extract(content, "usage").strip()
-    value = _strip_rd(_extract(content, "value"))
+    usage = " ".join(_extract(content, "usage").split())  # collapse to one line
+    value = " ".join(_strip_rd(_extract(content, "value")).split())  # collapse to one line
     examples_raw = _extract(content, "examples").strip()
     args = _extract_items(content, "arguments")
 
-    rst = f"{title}\n{'=' * len(title)}\n\n"
-
-    rst += f"{description}\n\n"
+    rst = ""
 
     if usage:
-        rst += "Usage\n-----\n\n"
-        rst += f".. code-block:: r\n\n"
-        for line in usage.splitlines():
-            rst += f"   {line}\n"
-        rst += "\n"
+        rst += f".. function:: {usage}\n\n"
 
-    if args:
-        rst += "Parameters\n----------\n\n"
-        rst += ".. list-table::\n"
-        rst += "   :header-rows: 1\n"
-        rst += "   :widths: 20 80\n\n"
-        rst += "   * - Parameter\n"
-        rst += "     - Description\n"
-        for name, desc in args:
-            cleaned = _strip_rd(desc).replace("\n", " ")
-            rst += f"   * - ``{name}``\n"
-            rst += f"     - {cleaned}\n"
-        rst += "\n"
+    rst += _indent(f"*{title}* — {description}" if title else description, "   ") + "\n\n"
+
+    for name, desc in args:
+        cleaned = " ".join(_strip_rd(desc).split())  # collapse to one line
+        rst += f"   :param {name}: {cleaned}\n"
 
     if value:
-        rst += "Returns\n-------\n\n"
-        rst += f"{value}\n\n"
+        rst += f"   :returns: {value}\n"
 
     if examples_raw:
         lines = [l for l in examples_raw.splitlines() if not l.strip().startswith("%")]
         example_code = "\n".join(lines).strip()
         if example_code:
-            rst += "Examples\n--------\n\n"
-            rst += ".. code-block:: r\n\n"
+            rst += "\n"
+            rst += "   .. rubric:: Example\n\n"
+            rst += "   .. code-block:: r\n\n"
             for line in example_code.splitlines():
-                rst += f"   {line}\n"
+                rst += f"      {line}\n"
             rst += "\n"
 
     return rst
@@ -150,28 +143,26 @@ def rd_to_rst(rd_path: Path) -> str:
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     rd_files = sorted(MAN_DIR.glob("*.Rd"))
-    # skip package-level Rd
     rd_files = [f for f in rd_files if not f.stem.endswith("-package")]
 
-    names: list[str] = []
-    for rd in rd_files:
-        rst_content = rd_to_rst(rd)
-        out_path = OUT_DIR / f"{rd.stem}.rst"
-        out_path.write_text(rst_content, encoding="utf-8")
-        names.append(rd.stem)
-        print(f"  {rd.name} → {out_path.relative_to(ROOT)}")
+    # Remove stale per-function .rst files from a previous run
+    for old in OUT_DIR.glob("*.rst"):
+        if old.name != "index.rst":
+            old.unlink()
 
     index = "R API Reference\n===============\n\n"
     index += "All functions accept a numeric vector ``x`` (and ``y`` for bivariate\n"
     index += "functions), a ``window_size`` integer, and an optional ``min_periods``\n"
     index += "parameter compatible with *pandas* semantics.\n\n"
-    index += ".. toctree::\n"
-    index += "   :maxdepth: 1\n"
-    index += "   :caption: Functions\n\n"
-    for name in sorted(names):
-        index += f"   {name}\n"
+
+    for i, rd in enumerate(rd_files):
+        index += rd_to_rst(rd)
+        if i < len(rd_files) - 1:
+            index += "\n----\n\n"
+        print(f"  {rd.name} → r_api/index.rst")
+
     (OUT_DIR / "index.rst").write_text(index, encoding="utf-8")
-    print(f"  → r_api/index.rst ({len(names)} entries)")
+    print(f"  -> r_api/index.rst ({len(rd_files)} functions)")
 
 
 if __name__ == "__main__":

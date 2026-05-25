@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath("../../py_package"))
 
 project = "robustrolling"
 author = "Igor Ptak"
-release = "0.1.0"
+release = "0.2.0"
 copyright = "2026, Igor Ptak"
 
 extensions = [

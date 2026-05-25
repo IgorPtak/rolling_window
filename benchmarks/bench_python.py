@@ -20,6 +20,7 @@ REPS = 10
 
 def bench(fn, reps: int = REPS) -> float:
     """Return median wall time in milliseconds over `reps` runs."""
+    fn()  # warmup: prime caches before timing
     times = []
     for _ in range(reps):
         t0 = time.perf_counter()
