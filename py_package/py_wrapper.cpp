@@ -189,12 +189,8 @@ PYBIND11_MODULE(robust_rolling_core, m) {
                      static_cast<py::ssize_t>(sizeof(double))});
              const auto *in = static_cast<const double *>(info.ptr);
              auto *out = static_cast<double *>(result.request().ptr);
-             for (py::ssize_t i = 0; i < info.shape[0]; ++i) {
-               self.update_skewness_only(in[i]);
-               out[i] = self.current_size() < min_periods
-                            ? std::numeric_limits<double>::quiet_NaN()
-                            : self.get_skewness();
-             }
+             self.process_skewness_batch(
+                 in, static_cast<std::size_t>(info.shape[0]), out, min_periods);
              return result;
            })
       .def("process_kurtosis_batch",
@@ -211,12 +207,8 @@ PYBIND11_MODULE(robust_rolling_core, m) {
                      static_cast<py::ssize_t>(sizeof(double))});
              const auto *in = static_cast<const double *>(info.ptr);
              auto *out = static_cast<double *>(result.request().ptr);
-             for (py::ssize_t i = 0; i < info.shape[0]; ++i) {
-               self.update(in[i]);
-               out[i] = self.current_size() < min_periods
-                            ? std::numeric_limits<double>::quiet_NaN()
-                            : self.get_kurtosis();
-             }
+             self.process_kurtosis_batch(
+                 in, static_cast<std::size_t>(info.shape[0]), out, min_periods);
              return result;
            });
 
@@ -284,10 +276,10 @@ PYBIND11_MODULE(robust_rolling_core, m) {
       if (info.ndim != 1)
         throw std::runtime_error("Input must be 1D array");
       std::size_t n = static_cast<std::size_t>(info.shape[0]);
-      auto result = py::array_t<double>(
-          py::array::ShapeContainer{info.shape[0]},
-          py::array::StridesContainer{
-              static_cast<py::ssize_t>(sizeof(double))});
+      auto result =
+          py::array_t<double>(py::array::ShapeContainer{info.shape[0]},
+                              py::array::StridesContainer{
+                                  static_cast<py::ssize_t>(sizeof(double))});
       (self.*method_ptr)(static_cast<const double *>(info.ptr), n,
                          static_cast<double *>(result.request().ptr),
                          min_periods);

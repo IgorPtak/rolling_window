@@ -159,14 +159,9 @@ SEXP rolling_skewness_c(SEXP r_data, SEXP r_window_size, SEXP r_min_periods) {
 
   SEXP r_result;
   PROTECT(r_result = Rf_allocVector(REALSXP, n));
-  double *output_ptr = REAL(r_result);
 
-  for (R_xlen_t i = 0; i < n; ++i) {
-    sm.update(input_ptr[i]);
-    output_ptr[i] = sm.current_size() < mp
-                        ? std::numeric_limits<double>::quiet_NaN()
-                        : sm.get_skewness();
-  }
+  sm.process_skewness_batch(input_ptr, static_cast<std::size_t>(n),
+                            REAL(r_result), mp);
 
   UNPROTECT(1);
   return r_result;
@@ -185,14 +180,9 @@ SEXP rolling_kurtosis_c(SEXP r_data, SEXP r_window_size, SEXP r_min_periods) {
 
   SEXP r_result;
   PROTECT(r_result = Rf_allocVector(REALSXP, n));
-  double *output_ptr = REAL(r_result);
 
-  for (R_xlen_t i = 0; i < n; ++i) {
-    sm.update(input_ptr[i]);
-    output_ptr[i] = sm.current_size() < mp
-                        ? std::numeric_limits<double>::quiet_NaN()
-                        : sm.get_kurtosis();
-  }
+  sm.process_kurtosis_batch(input_ptr, static_cast<std::size_t>(n),
+                            REAL(r_result), mp);
 
   UNPROTECT(1);
   return r_result;
