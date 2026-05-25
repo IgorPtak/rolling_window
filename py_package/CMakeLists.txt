@@ -19,7 +19,11 @@ target_sources(robust_rolling_core PRIVATE
   ../src_core/SlidingWelfordRing.cpp
 )
 
-target_compile_options(robust_rolling_core PRIVATE -O3 -march=native -funroll-loops -ffp-contract=fast -DNDEBUG -flto)
-target_link_options(robust_rolling_core PRIVATE -flto)
+if(MSVC)
+  target_compile_options(robust_rolling_core PRIVATE /O2 /DNDEBUG)
+else()
+  target_compile_options(robust_rolling_core PRIVATE -O3 -march=native -funroll-loops -ffp-contract=fast -DNDEBUG -flto)
+  target_link_options(robust_rolling_core PRIVATE -flto)
+endif()
 
 install(TARGETS robust_rolling_core LIBRARY DESTINATION .)
