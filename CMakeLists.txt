@@ -11,6 +11,7 @@ endif()
 
 add_library(rolling_core
     src_core/MultisetMedian.cpp
+    src_core/TwoHeapMedian.cpp
     src_core/MonotonicMax.cpp
     src_core/MonotonicMin.cpp
     src_core/SlidingWelford.cpp
