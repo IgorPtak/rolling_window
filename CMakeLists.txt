@@ -10,6 +10,7 @@ if(NOT MSVC)
 endif()
 
 add_library(rolling_core
+    src_core/FlatMedian.cpp
     src_core/MultisetMedian.cpp
     src_core/TwoHeapMedian.cpp
     src_core/MonotonicMax.cpp

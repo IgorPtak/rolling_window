@@ -5,6 +5,7 @@
 #include "SlidingMean.hpp"
 #include "SlidingMoments.hpp"
 #include "SlidingWelfordRing.hpp"
+#include "TwoHeapMedian.hpp"
 #include <benchmark/benchmark.h>
 #include <cstddef>
 #include <random>
@@ -21,8 +22,8 @@ static std::vector<double> make_data(std::size_t n, double nan_frac = 0.0) {
   return v;
 }
 
-const auto DATA_CLEAN = make_data(100'000);
-const auto DATA_NAN = make_data(100'000, 0.15); // 15% NaN
+const auto DATA_CLEAN = make_data(1'000'000);
+const auto DATA_NAN = make_data(1'000'000, 0.15); // 15% NaN
 
 static void BM_MonotonicMax(benchmark::State &state) {
   std::size_t w = static_cast<std::size_t>(state.range(0));
@@ -58,7 +59,19 @@ static void BM_MultisetMedian(benchmark::State &state) {
     }
   }
 }
-BENCHMARK(BM_MultisetMedian)->Arg(10)->Arg(100)->Arg(1000);
+BENCHMARK(BM_MultisetMedian)->Arg(10)->Arg(100)->Arg(1000)->Arg(5000)->Arg(20000);
+
+static void BM_TwoHeapMedian(benchmark::State &state) {
+  std::size_t w = static_cast<std::size_t>(state.range(0));
+  for (auto _ : state) {
+    TwoHeapMedian engine(w);
+    for (double v : DATA_CLEAN) {
+      engine.update(v);
+      benchmark::DoNotOptimize(engine.get_median());
+    }
+  }
+}
+BENCHMARK(BM_TwoHeapMedian)->Arg(10)->Arg(100)->Arg(1000)->Arg(5000)->Arg(20000);
 
 static void BM_SlidingMean(benchmark::State &state) {
   std::size_t w = static_cast<std::size_t>(state.range(0));
