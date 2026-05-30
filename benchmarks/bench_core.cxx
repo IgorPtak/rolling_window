@@ -1,3 +1,4 @@
+#include "SlidingMedian.hpp"
 #include "MonotonicMax.hpp"
 #include "MonotonicMin.hpp"
 #include "MultisetMedian.hpp"
@@ -59,7 +60,7 @@ static void BM_MultisetMedian(benchmark::State &state) {
     }
   }
 }
-BENCHMARK(BM_MultisetMedian)->Arg(10)->Arg(100)->Arg(1000)->Arg(5000)->Arg(20000);
+BENCHMARK(BM_MultisetMedian)->Arg(10)->Arg(100)->Arg(500)->Arg(1000)->Arg(5000)->Arg(20000);
 
 static void BM_TwoHeapMedian(benchmark::State &state) {
   std::size_t w = static_cast<std::size_t>(state.range(0));
@@ -72,6 +73,18 @@ static void BM_TwoHeapMedian(benchmark::State &state) {
   }
 }
 BENCHMARK(BM_TwoHeapMedian)->Arg(10)->Arg(100)->Arg(1000)->Arg(5000)->Arg(20000);
+
+static void BM_SlidingMedian(benchmark::State &state) {
+  std::size_t w = static_cast<std::size_t>(state.range(0));
+  for (auto _ : state) {
+    SlidingMedian engine(w);
+    for (double v : DATA_CLEAN) {
+      engine.update(v);
+      benchmark::DoNotOptimize(engine.get_median());
+    }
+  }
+}
+BENCHMARK(BM_SlidingMedian)->Arg(10)->Arg(100)->Arg(500)->Arg(1000)->Arg(5000);
 
 static void BM_SlidingMean(benchmark::State &state) {
   std::size_t w = static_cast<std::size_t>(state.range(0));
@@ -149,7 +162,37 @@ static void BM_MultisetMedian_NaN(benchmark::State &state) {
     }
   }
 }
-BENCHMARK(BM_MultisetMedian_NaN)->Arg(100);
+BENCHMARK(BM_MultisetMedian_NaN)->Arg(100)->Arg(1000);
+
+static void BM_SlidingMedian_NaN(benchmark::State &state) {
+  std::size_t w = static_cast<std::size_t>(state.range(0));
+  for (auto _ : state) {
+    SlidingMedian engine(w);
+    for (double v : DATA_NAN) {
+      if (std::isnan(v))
+        engine.skip();
+      else
+        engine.update(v);
+      benchmark::DoNotOptimize(engine.get_median());
+    }
+  }
+}
+BENCHMARK(BM_SlidingMedian_NaN)->Arg(100)->Arg(1000);
+
+static void BM_TwoHeapMedian_NaN(benchmark::State &state) {
+  std::size_t w = static_cast<std::size_t>(state.range(0));
+  for (auto _ : state) {
+    TwoHeapMedian engine(w);
+    for (double v : DATA_NAN) {
+      if (std::isnan(v))
+        engine.skip();
+      else
+        engine.update(v);
+      benchmark::DoNotOptimize(engine.get_median());
+    }
+  }
+}
+BENCHMARK(BM_TwoHeapMedian_NaN)->Arg(100)->Arg(1000);
 
 static void BM_SlidingMoments_NaN(benchmark::State &state) {
   std::size_t w = static_cast<std::size_t>(state.range(0));
