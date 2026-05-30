@@ -12,6 +12,7 @@ endif()
 add_library(rolling_core
     src_core/FlatMedian.cpp
     src_core/MultisetMedian.cpp
+    src_core/SlidingMedian.cpp
     src_core/TwoHeapMedian.cpp
     src_core/MonotonicMax.cpp
     src_core/MonotonicMin.cpp
@@ -83,6 +84,9 @@ add_executable(test_core
     tests/test_sliding_welford_ring.cxx
     tests/test_sliding_moments.cxx
     tests/test_sliding_covariance.cxx
+    tests/test_flat_median.cxx
+    tests/test_two_heap_median.cxx
+    tests/test_sliding_median.cxx
 )
 target_link_libraries(test_core PRIVATE rolling_core gtest gtest_main) 
 
@@ -91,3 +95,6 @@ gtest_discover_tests(test_core)
 
 add_executable(bench_core benchmarks/bench_core.cxx)
 target_link_libraries(bench_core PRIVATE rolling_core benchmark::benchmark benchmark::benchmark_main)
+
+add_executable(bench_median_sweep benchmarks/bench_median_sweep.cxx)
+target_link_libraries(bench_median_sweep PRIVATE rolling_core benchmark::benchmark benchmark::benchmark_main)

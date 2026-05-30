@@ -33,7 +33,7 @@ double MultisetMedian::get_median() const {
   return get_value();
 }
 
-// Recompute mid_ from scratch — used after size-changing operations.
+// Recompute mid_ from scratch - used after size-changing operations.
 void MultisetMedian::recompute_mid() {
   mid_ = window_data_.begin();
   std::advance(mid_, window_data_.size() / 2);
@@ -63,7 +63,7 @@ void MultisetMedian::update_impl(double new_value) {
     window_data_.insert(new_value);
 
     if (!std::isnan(oldest_val)) {
-      // Normal evict+insert: size stays same — use incremental mid_ adjustment.
+      // Normal evict+insert: size stays same use incremental mid_ adjustment.
       if (new_value < *mid_) {
         mid_--;
       }
