@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-06-08
+
+### Added
+
+#### C++
+- `TwoHeapMedian` — rolling median via max-heap / min-heap pair, O(log n);
+  faster than `MultisetMedian` for large clean windows
+- `FlatMedian` — rolling median via sorted array copy, O(k log k);
+  optimal for small windows (k ≤ 600 clean, k ≤ 1500 with NaN)
+- `SlidingMedian` — adaptive facade that selects `FlatMedian`,
+  `MultisetMedian`, or `TwoHeapMedian` at construction time based on
+  `window_size` and `expect_nan`; exposes unified CRTP interface
+
+#### Python
+- `rolling_median()` now backed by `SlidingMedian` (adaptive strategy)
+  instead of `MultisetMedian`; gains `expect_nan` parameter
+
+#### R
+- `rolling_median()` now backed by `SlidingMedian`; gains `expect_nan`
+  parameter
+
+#### Benchmarks
+- `bench_median_sweep.cxx` — C++ sweep across window sizes comparing all
+  three median implementations
+- Extended `bench_polars.py`, `bench_python.py`, `bench_r.R` with median
+  sections
+- `BENCHMARKS.md` — reference benchmark results
+
+### Changed
+- `rolling_median` (Python + R) delegates to `SlidingMedian` instead of
+  `MultisetMedian` directly; existing call sites are unaffected
+
+### Tests
+- C++ test suites: `test_flat_median`, `test_sliding_median`,
+  `test_two_heap_median` — cover correctness, memory layout, dtype
+  handling, and fuzz scenarios
+- Python tests rewritten for stricter dtype and robustness coverage
+- R wrapper made optional in CMake; removed R dependency from C++ CI
+
+---
+
 ## [0.2.0] - 2026-05-16
 
 ### Added

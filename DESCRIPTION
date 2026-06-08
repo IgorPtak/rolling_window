@@ -1,7 +1,7 @@
 Package: robustrolling
 Type: Package
 Title: Rolling Window Metrics via C++17
-Version: 0.1.0
+Version: 1.0.0
 Authors@R: person("Igor", "Ptak",
     email = "ptakigor2005@gmail.com",
     role = c("aut", "cre"))

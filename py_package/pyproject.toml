@@ -7,7 +7,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "robustrolling"
-version = "0.1.0"
+version = "1.0.0"
 description = "High-performance rolling window metrics implemented in C++17"
 readme = "README.md"
 requires-python = ">=3.10"
