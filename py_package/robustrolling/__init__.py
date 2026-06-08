@@ -3,14 +3,17 @@ from __future__ import annotations
 import numpy as np
 
 from robust_rolling_core import (
+    FlatMedian,
     MonotonicMax,
     MonotonicMin,
     MultisetMedian,
     SlidingCovariance,
     SlidingMean,
+    SlidingMedian,
     SlidingMoments,
     SlidingMomentsPrefix,
     SlidingWelford,
+    TwoHeapMedian,
 )
 
 try:
@@ -20,12 +23,15 @@ except ImportError:
     _HAS_PANDAS = False
 
 __all__ = [
+    "FlatMedian",
     "MonotonicMax",
     "MonotonicMin",
     "MultisetMedian",
     "SlidingCovariance",
+    "SlidingMedian",
     "SlidingMoments",
     "SlidingWelford",
+    "TwoHeapMedian",
     "rolling_max",
     "rolling_min",
     "rolling_variance",
@@ -171,12 +177,15 @@ def rolling_variance(x, window_size: int, min_periods: int | None = None,
     return _wrap(result, x)
 
 
-def rolling_median(x, window_size: int, min_periods: int | None = None):
+def rolling_median(x, window_size: int, min_periods: int | None = None,
+                   expect_nan: bool = False):
     """
     Compute the rolling median over a sliding window.
 
-    Uses a ``std::multiset`` with a tracked median iterator.
-    Time complexity: O(log n) per element.
+    Automatically selects the fastest algorithm for the given window size and
+    NaN density. Use ``expect_nan=True`` if the input is expected to contain
+    a significant fraction of NaN values (avoids MultisetMedian's O(n)
+    iterator-shift degradation at large windows).
 
     Parameters
     ----------
@@ -187,6 +196,9 @@ def rolling_median(x, window_size: int, min_periods: int | None = None):
     min_periods : int, optional
         Minimum number of non-NaN observations required to return a result.
         Defaults to ``window_size`` (pandas-compatible semantics).
+    expect_nan : bool, optional
+        Hint that the input may contain many NaN values. Switches the
+        dispatch thresholds to NaN-robust paths. Defaults to ``False``.
 
     Returns
     -------
@@ -204,7 +216,7 @@ def rolling_median(x, window_size: int, min_periods: int | None = None):
     """
     arr = _to_float64(x)
     mp = _resolve_min_periods(min_periods, window_size)
-    result = MultisetMedian(window_size).process_batch(arr, mp)
+    result = SlidingMedian(window_size, expect_nan).process_batch(arr, mp)
     return _wrap(result, x)
 
 

@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 project(robust_rolling_python LANGUAGES CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 find_package(pybind11 CONFIG REQUIRED)
 
@@ -9,14 +12,17 @@ pybind11_add_module(robust_rolling_core py_wrapper.cpp)
 target_include_directories(robust_rolling_core PRIVATE ../include)
 
 target_sources(robust_rolling_core PRIVATE
+  ../src_core/FlatMedian.cpp
   ../src_core/MonotonicMax.cpp
   ../src_core/MonotonicMin.cpp
   ../src_core/MultisetMedian.cpp
   ../src_core/SlidingCovariance.cpp
   ../src_core/SlidingMean.cpp
+  ../src_core/SlidingMedian.cpp
   ../src_core/SlidingMoments.cpp
   ../src_core/SlidingMomentsPrefix.cpp
   ../src_core/SlidingWelfordRing.cpp
+  ../src_core/TwoHeapMedian.cpp
 )
 
 if(MSVC)
