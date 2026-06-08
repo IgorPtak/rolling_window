@@ -103,13 +103,20 @@ rolling_min <- function(x, window_size, min_periods = window_size) {
 #' @title Rolling Median
 #'
 #' @description
-#' Computes the rolling median over a numeric vector using an ordered multiset
-#' with a tracked median iterator. Time complexity: O(log n) per element.
+#' Computes the rolling median over a numeric vector. Automatically selects the
+#' fastest algorithm based on window size and expected NaN density: FlatMedian
+#' (sorted vector) for small windows, MultisetMedian (red-black tree) for
+#' medium windows, or TwoHeapMedian (lazy-deletion heaps) for large windows or
+#' NaN-heavy data.
 #'
 #' @param x A numeric vector of type double.
 #' @param window_size Positive integer window length.
 #' @param min_periods Minimum number of non-\code{NA} observations required in
 #'   a window to return a result. Defaults to \code{window_size}.
+#' @param expect_nan Logical. If \code{TRUE}, hints that the input may contain
+#'   many \code{NA} values; switches dispatch thresholds to NaN-robust paths
+#'   (avoids MultisetMedian's iterator-shift degradation). Defaults to
+#'   \code{FALSE}.
 #'
 #' @return
 #' A numeric vector with rolling median values.
@@ -119,12 +126,13 @@ rolling_min <- function(x, window_size, min_periods = window_size) {
 #' @examples
 #' x <- as.double(c(1, 3, 2, 5, 4))
 #' rolling_median(x, 3L)
-rolling_median <- function(x, window_size, min_periods = window_size) {
+rolling_median <- function(x, window_size, min_periods = window_size,
+                           expect_nan = FALSE) {
   x <- as.double(x)
   .check_window(window_size)
   mp <- .check_min_periods(min_periods, window_size)
   .Call("rolling_median_c", x, as.integer(window_size), as.integer(mp),
-        PACKAGE = "robustrolling")
+        as.logical(expect_nan), PACKAGE = "robustrolling")
 }
 
 #' @title Rolling Mean

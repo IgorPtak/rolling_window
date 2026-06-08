@@ -4,7 +4,7 @@
 \alias{rolling_median}
 \title{Rolling Median}
 \usage{
-rolling_median(x, window_size, min_periods = window_size)
+rolling_median(x, window_size, min_periods = window_size, expect_nan = FALSE)
 }
 \arguments{
 \item{x}{A numeric vector of type double.}
@@ -13,13 +13,21 @@ rolling_median(x, window_size, min_periods = window_size)
 
 \item{min_periods}{Minimum number of non-\code{NA} observations required in
 a window to return a result. Defaults to \code{window_size}.}
+
+\item{expect_nan}{Logical. If \code{TRUE}, hints that the input may contain
+many \code{NA} values; switches dispatch thresholds to NaN-robust paths
+(avoids MultisetMedian's iterator-shift degradation). Defaults to
+\code{FALSE}.}
 }
 \value{
 A numeric vector with rolling median values.
 }
 \description{
-Computes the rolling median over a numeric vector using an ordered multiset
-with a tracked median iterator. Time complexity: O(log n) per element.
+Computes the rolling median over a numeric vector. Automatically selects the
+fastest algorithm based on window size and expected NaN density: FlatMedian
+(sorted vector) for small windows, MultisetMedian (red-black tree) for
+medium windows, or TwoHeapMedian (lazy-deletion heaps) for large windows or
+NaN-heavy data.
 }
 \examples{
 x <- as.double(c(1, 3, 2, 5, 4))
