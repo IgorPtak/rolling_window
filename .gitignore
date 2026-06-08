@@ -28,6 +28,9 @@ src/SlidingMoments.cpp
 src/SlidingMean.cpp
 src/SlidingCovariance.cpp
 src/SlidingMomentsPrefix.cpp
+src/FlatMedian.cpp
+src/SlidingMedian.cpp
+src/TwoHeapMedian.cpp
 
 inst/include/
 

@@ -169,6 +169,66 @@ print_stable_vs_fast <- function(n, df) {
   }
 }
 
+## ── rolling_median dispatch sweep ─────────────────────────────────────────────
+
+MEDIAN_WINDOWS <- c(10L, 50L, 100L, 200L, 300L, 400L, 500L,
+                    600L, 700L, 800L, 1000L, 2000L, 5000L)
+MEDIAN_N       <- 500000L
+NAN_FRAC       <- 0.15
+
+which_algo <- function(w, nan_hint) {
+  if (nan_hint) {
+    if (w <= 1500L) "FlatMedian" else "TwoHeapMedian"
+  } else {
+    if (w <= 600L)  "FlatMedian"
+    else if (w <= 2000L) "MultisetMedian"
+    else "TwoHeapMedian"
+  }
+}
+
+run_median_sweep <- function() {
+  set.seed(42)
+  data_clean <- as.double(rnorm(MEDIAN_N))
+  data_nan   <- data_clean
+  data_nan[sample(MEDIAN_N, floor(MEDIAN_N * NAN_FRAC))] <- NA_real_
+
+  rows <- lapply(MEDIAN_WINDOWS, function(w) {
+    time_ms <- function(x, expect_nan) {
+      bm <- bench::mark(
+        rolling_median(x, w, min_periods = 0L, expect_nan = expect_nan),
+        iterations = 3L, check = FALSE, memory = FALSE
+      )
+      as.numeric(bm$median) * 1000
+    }
+    data.frame(
+      window          = w,
+      clean_algo      = which_algo(w, FALSE),
+      clean_ms        = time_ms(data_clean, FALSE),
+      nan_algo        = which_algo(w, TRUE),
+      nan_ms          = time_ms(data_nan,   TRUE),
+      nan_default_ms  = time_ms(data_nan,   FALSE),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, rows)
+}
+
+print_median_sweep <- function(df) {
+  cat(sprintf("\n  %-8s  %-15s  %10s    %-15s  %10s  %10s\n",
+              "window", "clean algo", "clean ms",
+              "nan algo", "nan ms", "nan(def) ms"))
+  cat("  ", strrep("-", 80), "\n", sep = "")
+  for (i in seq_len(nrow(df))) {
+    r <- df[i, ]
+    cat(sprintf("  %-8d  %-15s  %8.1f ms    %-15s  %8.1f ms  %8.1f ms\n",
+                r$window,
+                r$clean_algo, r$clean_ms,
+                r$nan_algo,   r$nan_ms, r$nan_default_ms))
+  }
+  cat("\n  nan ms       = expect_nan=TRUE  (NaN-robust dispatch path)\n")
+  cat("  nan(def) ms  = expect_nan=FALSE (default path on NaN-heavy data)\n")
+}
+
 cat("robustrolling vs slider vs RcppRoll\n")
 cat(strrep("=", 80), "\n")
 for (n in SIZES) {
@@ -189,5 +249,10 @@ for (n in SIZES) {
   df <- run_stable_vs_fast(n)
   print_stable_vs_fast(n, df)
 }
+
+cat("\n\nrolling_median dispatch sweep  (n = 500 000, NaN fraction = 15%)\n")
+cat(strrep("=", 80), "\n")
+df_sweep <- run_median_sweep()
+print_median_sweep(df_sweep)
 
 cat("\n")

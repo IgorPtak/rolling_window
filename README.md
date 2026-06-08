@@ -13,7 +13,7 @@ High-performance rolling window metrics for R and Python, implemented in C++17.
 `robustrolling` provides numerically stable, memory-efficient rolling window
 algorithms built in C++17 and exposed to both R and Python. All algorithms:
 
-- run in **O(1) time per element** (O(log n) for median),
+- run in **O(1) time per element** (O(log w) for median),
 - handle **NaN / NA transparently**,
 - support a **`min_periods`** parameter (pandas-compatible semantics),
 - share a common **CRTP base** (`RollingMetric<Derived>`) — zero virtual
@@ -25,16 +25,19 @@ algorithms built in C++17 and exposed to both R and Python. All algorithms:
 
 ## Features
 
-| C++ class              | Algorithm                                    | Time           | R API                                                       | Python class           |
-| ---------------------- | -------------------------------------------- | -------------- | ----------------------------------------------------------- | ---------------------- |
-| `SlidingMean`          | Prefix sum + SIMD (ARM NEON / AVX2)          | O(n) batch     | `rolling_mean()`                                            | `SlidingMean`          |
-| `SlidingWelfordRing`   | Welford online + ring buffer                 | O(1)           | `rolling_variance()` (`method="stable"`)                    | `SlidingWelford`       |
-| `SlidingMomentsPrefix` | Prefix sums of raw moments                   | O(n) batch     | `rolling_variance/skewness/kurtosis()` (`method="fast"`)    | `SlidingMomentsPrefix` |
-| `MonotonicMax`         | Monotonic deque                              | O(1) amortised | `rolling_max()`                                             | `MonotonicMax`         |
-| `MonotonicMin`         | Monotonic deque                              | O(1) amortised | `rolling_min()`                                             | `MonotonicMin`         |
-| `MultisetMedian`       | `std::multiset` dual-iterator                | O(log n)       | `rolling_median()`                                          | `MultisetMedian`       |
-| `SlidingMoments`       | Terriberry's 4th-moment recurrence           | O(1)           | `rolling_skewness/kurtosis()` (`method="stable"`)           | `SlidingMoments`       |
-| `SlidingCovariance`    | Welford 2D online                            | O(1)           | `rolling_cov()` `rolling_cor()`                             | `SlidingCovariance`    |
+| C++ class              | Algorithm                             | Time           | R API                                                    | Python class           |
+| ---------------------- | ------------------------------------- | -------------- | -------------------------------------------------------- | ---------------------- |
+| `SlidingMean`          | Prefix sum + SIMD (ARM NEON / AVX2)   | O(n) batch     | `rolling_mean()`                                         | `SlidingMean`          |
+| `SlidingWelfordRing`   | Welford online + ring buffer          | O(1)           | `rolling_variance()` (`method="stable"`)                 | `SlidingWelford`       |
+| `SlidingMomentsPrefix` | Prefix sums of raw moments            | O(n) batch     | `rolling_variance/skewness/kurtosis()` (`method="fast"`) | `SlidingMomentsPrefix` |
+| `MonotonicMax`         | Monotonic deque                       | O(1) amortised | `rolling_max()`                                          | `MonotonicMax`         |
+| `MonotonicMin`         | Monotonic deque                       | O(1) amortised | `rolling_min()`                                          | `MonotonicMin`         |
+| `SlidingMedian`        | Auto-dispatches to one of three below | —              | `rolling_median()` (`expect_nan=`)                       | `SlidingMedian`        |
+| `FlatMedian`           | Sorted vector + binary search         | O(w) insert    | —                                                        | `FlatMedian`           |
+| `MultisetMedian`       | `std::multiset` + tracked iterator    | O(log w)       | —                                                        | `MultisetMedian`       |
+| `TwoHeapMedian`        | Two heaps + lazy deletion             | O(log w)       | —                                                        | `TwoHeapMedian`        |
+| `SlidingMoments`       | Terriberry's 4th-moment recurrence    | O(1)           | `rolling_skewness/kurtosis()` (`method="stable"`)        | `SlidingMoments`       |
+| `SlidingCovariance`    | Welford 2D online                     | O(1)           | `rolling_cov()` `rolling_cor()`                          | `SlidingCovariance`    |
 
 ---
 
@@ -101,6 +104,22 @@ rolling_median(x, 3L)
 #> [1] NA NA  2  3  4
 ```
 
+The implementation is chosen automatically from the window size:
+
+| Window size   | Default (`expect_nan=FALSE`) | With `expect_nan=TRUE` |
+| ------------- | ---------------------------- | ---------------------- |
+| ≤ 600         | `FlatMedian`                 | `FlatMedian`           |
+| 601 – 1 500   | `MultisetMedian`             | `FlatMedian`           |
+| 1 501 – 2 000 | `MultisetMedian`             | `TwoHeapMedian`        |
+| > 2 000       | `TwoHeapMedian`              | `TwoHeapMedian`        |
+
+Pass `expect_nan = TRUE` when your data contains many `NA` values to avoid
+`MultisetMedian`'s O(w) iterator-shift degradation on NaN-heavy data:
+
+```r
+rolling_median(x, 1000L, expect_nan = TRUE)
+```
+
 **Variance and mean**
 
 ```r
@@ -122,6 +141,8 @@ rolling_skewness(y, 3L)
 rolling_kurtosis(y, 4L)
 #> [1] NA NA NA -1.2 -1.2
 ```
+
+Returns excess kurtosis (Fisher's definition; normal distribution = 0).
 
 **Covariance and Pearson correlation**
 
@@ -183,6 +204,9 @@ rr.rolling_min(x, 3)
 
 rr.rolling_median(x, 3)
 # array([nan, nan,  2.,  3.,  4.])
+
+# NaN-heavy data — use expect_nan=True for large windows
+rr.rolling_median(x, 1000, expect_nan=True)
 ```
 
 ```python
@@ -200,6 +224,8 @@ rr.rolling_skewness(y, 3)
 rr.rolling_kurtosis(y, 4)
 # array([nan, nan,  nan, -1.2, -1.2])
 ```
+
+Returns sample variance (ddof=1) and excess kurtosis (Fisher's definition).
 
 ```python
 a = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
@@ -249,28 +275,62 @@ rr.rolling_max(prices, 3)
 Direct access to the engine objects for incremental (streaming) use:
 
 ```python
-from robustrolling import MonotonicMax, SlidingMoments, SlidingCovariance
 import numpy as np
+import robust_rolling_core as rrc
 
 # Streaming — one value at a time
-engine = MonotonicMax(3)
+engine = rrc.MonotonicMax(3)
 for v in [1.0, 3.0, 2.0, 5.0]:
     engine.update(v)
-    print(engine.get_value())
+    print(engine.get_max())
 # 1.0 → 3.0 → 3.0 → 5.0
 
 # Batch — zero-copy NumPy buffer
-engine2 = SlidingMoments(3)
+engine2 = rrc.SlidingMoments(3)
 x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-print(engine2.process_skewness_batch(x))
+print(engine2.process_skewness_batch(x, 0))
 # [nan, nan, 0., 0., 0.]
 
 # Covariance engine
-cov_engine = SlidingCovariance(3)
+cov_engine = rrc.SlidingCovariance(3)
 a = np.array([1.0, 2.0, 3.0, 4.0])
 b = np.array([2.0, 4.0, 6.0, 8.0])
 print(cov_engine.process_covariance_batch(a, b))
 # [nan, nan, 2., 2.]
+```
+
+**Median — auto-dispatch and direct algorithm access**
+
+```python
+# Auto-dispatcher: picks FlatMedian / MultisetMedian / TwoHeapMedian
+# based on window size and NaN hint
+rrc.SlidingMedian(300).process_batch(x)                   # → FlatMedian     (w ≤ 600)
+rrc.SlidingMedian(700).process_batch(x)                   # → MultisetMedian (601–2000)
+rrc.SlidingMedian(3000).process_batch(x)                  # → TwoHeapMedian  (w > 2000)
+rrc.SlidingMedian(700, expect_nan=True).process_batch(x)  # → FlatMedian     (w ≤ 1500)
+
+# Direct access — bypass dispatch and use a specific algorithm
+rrc.FlatMedian(700).process_batch(x)
+rrc.MultisetMedian(700).process_batch(x)
+rrc.TwoHeapMedian(700).process_batch(x)
+```
+
+All four classes share the same interface:
+`process_batch(array, min_periods=0)`, `update(value)`, `get_median()`.
+
+**Fast batch API — `SlidingMomentsPrefix`**
+
+`SlidingMomentsPrefix` is a stateless batch engine (prefix sums of raw
+moments). It is faster than the online `SlidingMoments` but less numerically
+stable for data with extreme values:
+
+```python
+prefix = rrc.SlidingMomentsPrefix(3)
+print(prefix.variance_batch(x))   # [nan, 0.5, 1., 1., 1.]
+print(prefix.skewness_batch(x))   # [nan, nan, 0., 0., 0.]
+
+prefix4 = rrc.SlidingMomentsPrefix(4)
+print(prefix4.kurtosis_batch(x))  # [nan, nan, nan, -1.2, -1.2]
 ```
 
 ---
@@ -278,60 +338,34 @@ print(cov_engine.process_covariance_batch(a, b))
 ## Performance
 
 Benchmarked on Apple M-series (ARM), window = 100, n = 1 000 000.
+Full tables with all window sizes and R comparisons: [BENCHMARKS.md](BENCHMARKS.md).
 
-### Python vs pandas
+### Python vs pandas (highlights)
 
-| Function             | robustrolling | pandas   | speedup  |
-| -------------------- | ------------- | -------- | -------- |
-| `rolling_mean`       | 3.1 ms        | 4.4 ms   | **1.4x** |
-| `rolling_max`        | 11.1 ms       | 11.7 ms  | 1.1x     |
-| `rolling_min`        | 11.2 ms       | 12.2 ms  | 1.1x     |
-| `rolling_median`     | 106 ms        | 233 ms   | **2.2x** |
-| `rolling_variance`   | 15.2 ms       | 9.6 ms   | 0.6x     |
-| `rolling_skewness`   | 14.0 ms       | 9.1 ms   | 0.6x     |
-| `rolling_kurtosis`   | 14.3 ms       | 9.2 ms   | 0.6x     |
-| `rolling_cov`        | 14.8 ms       | 18.2 ms  | **1.2x** |
-| `rolling_cor`        | 14.6 ms       | 36.7 ms  | **2.5x** |
+| Function           | robustrolling | pandas  | speedup  |
+| ------------------ | ------------- | ------- | -------- |
+| `rolling_mean`     | 3.1 ms        | 4.4 ms  | **1.4x** |
+| `rolling_median`   | 106 ms        | 233 ms  | **2.2x** |
+| `rolling_cov`      | 14.8 ms       | 18.2 ms | **1.2x** |
+| `rolling_cor`      | 14.6 ms       | 36.7 ms | **2.5x** |
 
-### Python vs Polars
+### Python vs Polars (highlights)
 
-| Function             | robustrolling | Polars   | speedup  |
-| -------------------- | ------------- | -------- | -------- |
-| `rolling_mean`       | 3.1 ms        | 8.0 ms   | **2.6x** |
-| `rolling_max`        | 11.1 ms       | 11.4 ms  | 1.0x     |
-| `rolling_min`        | 11.0 ms       | 11.6 ms  | 1.1x     |
-| `rolling_median`     | 106 ms        | 40.8 ms  | 0.4x     |
-| `rolling_variance`   | 15.7 ms       | 16.2 ms  | 1.0x     |
-| `rolling_skewness`   | 13.9 ms       | 16.0 ms  | **1.2x** |
-| `rolling_kurtosis`   | 14.3 ms       | 15.6 ms  | 1.1x     |
+`rolling_median` uses `FlatMedian` at window ≤ 600; `TwoHeapMedian` wins at
+large windows where Polars' fixed O(w) algorithm loses ground.
 
-### Python — stable vs fast
+| Function           | robustrolling | Polars  | speedup           |
+| ------------------ | ------------- | ------- | ----------------- |
+| `rolling_mean`     | 3.1 ms        | 8.0 ms  | **2.6x**          |
+| `rolling_skewness` | 13.9 ms       | 16.0 ms | **1.2x**          |
+| `rolling_median`   | 170 ms        | 430 ms  | **2.5x** (w=5000) |
 
-| Function               | stable   | fast     | speedup  |
-| ---------------------- | -------- | -------- | -------- |
-| `mean` (assume_finite) | 3.2 ms   | 0.73 ms  | **4.4x** |
-| `variance`             | 15.2 ms  | 3.9 ms   | **3.9x** |
-| `skewness`             | 13.9 ms  | 10.0 ms  | **1.4x** |
-| `kurtosis`             | 14.4 ms  | 7.6 ms   | **1.9x** |
+### R vs slider vs RcppRoll (highlights)
 
-### R vs slider vs RcppRoll
-
-| Function             | robustrolling | slider     | RcppRoll  | vs slider  | vs RcppRoll |
-| -------------------- | ------------- | ---------- | --------- | ---------- | ----------- |
-| `rolling_max`        | 15.1 ms       | 338 ms     | 175 ms    | **22x**    | **12x**     |
-| `rolling_min`        | 14.9 ms       | 350 ms     | 175 ms    | **24x**    | **12x**     |
-| `rolling_mean`       | 3.1 ms        | 1 523 ms   | 37.4 ms   | **487x**   | **12x**     |
-| `rolling_variance`   | 16.0 ms       | 2 477 ms   | 304 ms    | **154x**   | **19x**     |
-| `rolling_median`     | 112 ms        | 10 084 ms  | 1 938 ms  | **90x**    | **17x**     |
-
-### R — stable vs fast
-
-| Function               | stable   | fast     | speedup  |
-| ---------------------- | -------- | -------- | -------- |
-| `mean` (assume_finite) | 3.2 ms   | 0.78 ms  | **4.0x** |
-| `variance`             | 16.2 ms  | 4.1 ms   | **4.0x** |
-| `skewness`             | 14.5 ms  | 10.3 ms  | **1.4x** |
-| `kurtosis`             | 14.4 ms  | 7.8 ms   | **1.8x** |
+| Function           | robustrolling | slider    | RcppRoll | vs slider | vs RcppRoll |
+| ------------------ | ------------- | --------- | -------- | --------- | ----------- |
+| `rolling_mean`     | 3.1 ms        | 1 523 ms  | 37.4 ms  | **487x**  | **12x**     |
+| `rolling_median`   | 112 ms        | 10 084 ms | 1 938 ms | **90x**   | **17x**     |
 
 ---
 
@@ -345,13 +379,24 @@ RollingMetric<Derived>
 ├── SlidingMean          — prefix sum + ARM NEON / AVX2 SIMD
 ├── MonotonicMax         — monotonic deque (max)
 ├── MonotonicMin         — monotonic deque (min)
-├── MultisetMedian       — std::multiset + dual-iterator median tracking
+├── FlatMedian           — sorted vector + binary search  (best: w ≤ 600)
+├── MultisetMedian       — std::multiset + tracked iterator (best: 601–2000)
+├── TwoHeapMedian        — two heaps + lazy deletion (best: w > 2000 or NaN-heavy)
+├── SlidingMedian        — dispatcher: holds variant<Flat,Multiset,TwoHeap>,
+│                          selects implementation once in the constructor
 ├── SlidingWelfordRing   — Welford variance + ring buffer eviction
 ├── SlidingMoments       — Terriberry's 4th-moment recurrence
 └── SlidingCovariance    — 2D Welford for covariance and Pearson correlation
 
 SlidingMomentsPrefix     — stateless batch engine (prefix sums of raw moments)
 ```
+
+`SlidingMedian` dispatch rules (`std::visit` — zero runtime overhead):
+
+| `expect_nan` | w ≤ 600    | 601 – 1 500    | 1 501 – 2 000  | w > 2 000     |
+| ------------ | ---------- | -------------- | -------------- | ------------- |
+| `false`      | FlatMedian | MultisetMedian | MultisetMedian | TwoHeapMedian |
+| `true`       | FlatMedian | FlatMedian     | TwoHeapMedian  | TwoHeapMedian |
 
 **Bindings:**
 
@@ -366,12 +411,12 @@ SlidingMomentsPrefix     — stateless batch engine (prefix sums of raw moments)
 
 ### Requirements
 
-| Tool         | Version                                   |
-| ------------ | ----------------------------------------- |
+| Tool         | Version                                    |
+| ------------ | ------------------------------------------ |
 | C++ compiler | C++17 (GCC ≥ 9, Clang ≥ 10, MSVC ≥ 2019) |
-| CMake        | ≥ 3.14                                    |
-| R            | ≥ 4.0                                     |
-| Python       | ≥ 3.10                                    |
+| CMake        | ≥ 3.14                                     |
+| R            | ≥ 4.0                                      |
+| Python       | ≥ 3.10                                     |
 
 ### Build and test
 
@@ -391,7 +436,8 @@ make py-test   # pytest
 
 # Benchmarks
 Rscript benchmarks/bench_r.R
-python benchmarks/bench_python.py
+python benchmarks/bench_python.py   # vs pandas + stable/fast + median sweep
+python benchmarks/bench_polars.py   # vs Polars + median sweep vs Polars
 ```
 
 ---
