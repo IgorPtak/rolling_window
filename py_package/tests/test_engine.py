@@ -1,4 +1,4 @@
-"""Tests for the C++ engine layer (rrc.*) — stateful rolling objects."""
+"""Tests for the C++ engine layer (rrc.*) - stateful rolling objects."""
 import math
 
 import numpy as np
@@ -173,7 +173,102 @@ class TestMonotonicMin:
             rrc.MonotonicMin(2).process_batch(np.ones((2, 3)))
 
 
-# ── MultisetMedian ─────────────────────────────────────────────────────────────
+# ── SlidingMedian ──────────────────────────────────────────────────────────────
+
+class TestSlidingMedian:
+
+    def test_known_values_odd_window(self):
+        x = np.array([1.0, 3.0, 2.0, 5.0, 4.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(3).process_batch(x),
+                                   median_ref(x, 3), rtol=1e-12)
+
+    def test_known_values_even_window(self):
+        x = np.array([1.0, 3.0, 2.0, 4.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(4).process_batch(x),
+                                   median_ref(x, 4), rtol=1e-12)
+
+    def test_window_size_1_identity(self):
+        x = np.array([-1.0, 0.0, 10.0, 2.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(1).process_batch(x), x)
+
+    def test_window_size_2(self):
+        x = np.array([3.0, 1.0, 2.0, 5.0, 4.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(2).process_batch(x),
+                                   median_ref(x, 2), rtol=1e-12)
+
+    def test_even_window_descending_fill(self):
+        x = np.array([4.0, 3.0, 2.0, 1.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(4).process_batch(x),
+                                   median_ref(x, 4), rtol=1e-12)
+
+    @pytest.mark.parametrize("k", [2, 3, 5])
+    def test_against_naive_reference(self, k):
+        x = np.array([-2.0, 6.0, 1.0, -8.0, 0.0, 8.0, -1.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(k).process_batch(x),
+                                   median_ref(x, k), rtol=1e-12)
+
+    def test_large_array_against_reference(self):
+        np.random.seed(42)
+        x = np.random.randn(1000)
+        k = 15
+        np.testing.assert_allclose(rrc.SlidingMedian(k).process_batch(x),
+                                   median_ref(x, k), rtol=1e-10)
+
+    def test_element_entering_equals_leaving(self):
+        x = np.array([1.0, 2.0, 3.0, 1.0, 2.0, 3.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(3).process_batch(x),
+                                   median_ref(x, 3), rtol=1e-12)
+
+    def test_window_larger_than_array(self):
+        x = np.array([3.0, 1.0, 4.0, 1.0])
+        np.testing.assert_allclose(rrc.SlidingMedian(20).process_batch(x),
+                                   median_ref(x, 20), rtol=1e-12)
+
+    def test_nan_does_not_contribute(self):
+        # window=3, [1, 2, NaN, 4]: at NaN window=[1,2,NaN] -> median=1.5
+        x = np.array([1.0, 2.0, np.nan, 4.0])
+        out = rrc.SlidingMedian(3).process_batch(x)
+        assert np.isclose(out[2], 1.5, atol=1e-12)
+        assert np.isclose(out[3], 3.0, atol=1e-12)  # window=[2,NaN,4] -> median([2,4])=3
+
+    def test_expect_nan_flag_same_results(self):
+        np.random.seed(7)
+        x = np.random.randn(200)
+        x[np.random.rand(200) < 0.15] = np.nan
+        k = 20
+        out_default = rrc.SlidingMedian(k, False).process_batch(x)
+        out_nan = rrc.SlidingMedian(k, True).process_batch(x)
+        np.testing.assert_allclose(out_default, out_nan, rtol=1e-12, equal_nan=True)
+
+    def test_empty_input(self):
+        out = rrc.SlidingMedian(3).process_batch(np.array([]))
+        assert len(out) == 0 and out.dtype == np.float64
+
+    def test_rejects_zero_window(self):
+        with pytest.raises(ValueError, match="Window length must be greater than 0"):
+            rrc.SlidingMedian(0)
+
+    def test_rejects_none_window(self):
+        with pytest.raises(TypeError):
+            rrc.SlidingMedian(None)
+
+    def test_rejects_2d_input(self):
+        with pytest.raises(RuntimeError, match="Input must be 1D array"):
+            rrc.SlidingMedian(2).process_batch(np.ones((2, 3)))
+
+    def test_integer_input_converted_to_float64(self):
+        out = rrc.SlidingMedian(2).process_batch(np.array([1, 2, 3], dtype=np.int32))
+        assert out.dtype == np.float64
+
+    @pytest.mark.parametrize("k", [100, 700, 2500])
+    def test_dispatch_thresholds_correct_result(self, k):
+        np.random.seed(k)
+        x = np.random.randn(k * 3)
+        np.testing.assert_allclose(rrc.SlidingMedian(k).process_batch(x),
+                                   median_ref(x, k), rtol=1e-10)
+
+
+# ── MultisetMedian (raw algorithm, advanced use) ───────────────────────────────
 
 class TestMultisetMedian:
 
@@ -181,15 +276,6 @@ class TestMultisetMedian:
         x = np.array([1.0, 3.0, 2.0, 5.0, 4.0])
         np.testing.assert_allclose(rrc.MultisetMedian(3).process_batch(x),
                                    median_ref(x, 3), rtol=1e-12)
-
-    def test_known_values_even_window(self):
-        x = np.array([1.0, 3.0, 2.0, 4.0])
-        np.testing.assert_allclose(rrc.MultisetMedian(4).process_batch(x),
-                                   median_ref(x, 4), rtol=1e-12)
-
-    def test_window_size_1_identity(self):
-        x = np.array([-1.0, 0.0, 10.0, 2.0])
-        np.testing.assert_allclose(rrc.MultisetMedian(1).process_batch(x), x)
 
     def test_window_size_2_regression(self):
         # Regression: window_size=2 caused segfault before fix
@@ -209,49 +295,9 @@ class TestMultisetMedian:
         np.testing.assert_allclose(rrc.MultisetMedian(k).process_batch(x),
                                    median_ref(x, k), rtol=1e-12)
 
-    def test_large_array_against_reference(self):
-        np.random.seed(42)
-        x = np.random.randn(1000)
-        k = 15
-        np.testing.assert_allclose(rrc.MultisetMedian(k).process_batch(x),
-                                   median_ref(x, k), rtol=1e-10)
-
-    def test_element_entering_equals_leaving(self):
-        x = np.array([1.0, 2.0, 3.0, 1.0, 2.0, 3.0])
-        np.testing.assert_allclose(rrc.MultisetMedian(3).process_batch(x),
-                                   median_ref(x, 3), rtol=1e-12)
-
-    def test_window_larger_than_array(self):
-        x = np.array([3.0, 1.0, 4.0, 1.0])
-        np.testing.assert_allclose(rrc.MultisetMedian(20).process_batch(x),
-                                   median_ref(x, 20), rtol=1e-12)
-
-    def test_nan_does_not_contribute(self):
-        # window=3, [1, 2, NaN, 4]: at NaN window=[1,2,NaN] -> median=1.5
-        x = np.array([1.0, 2.0, np.nan, 4.0])
-        out = rrc.MultisetMedian(3).process_batch(x)
-        assert np.isclose(out[2], 1.5, atol=1e-12)
-        assert np.isclose(out[3], 3.0, atol=1e-12)  # window=[2,NaN,4] -> median([2,4])=3
-
-    def test_empty_input(self):
-        out = rrc.MultisetMedian(3).process_batch(np.array([]))
-        assert len(out) == 0 and out.dtype == np.float64
-
     def test_rejects_zero_window(self):
         with pytest.raises(ValueError, match="Window length must be greater than 0"):
             rrc.MultisetMedian(0)
-
-    def test_rejects_none_window(self):
-        with pytest.raises(TypeError):
-            rrc.MultisetMedian(None)
-
-    def test_rejects_2d_input(self):
-        with pytest.raises(RuntimeError, match="Input must be 1D array"):
-            rrc.MultisetMedian(2).process_batch(np.ones((2, 3)))
-
-    def test_integer_input_converted_to_float64(self):
-        out = rrc.MultisetMedian(2).process_batch(np.array([1, 2, 3], dtype=np.int32))
-        assert out.dtype == np.float64
 
 
 # ── SlidingMean ────────────────────────────────────────────────────────────────

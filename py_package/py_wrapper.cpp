@@ -1,11 +1,14 @@
+#include "../include/FlatMedian.hpp"
 #include "../include/MonotonicMax.hpp"
 #include "../include/MonotonicMin.hpp"
 #include "../include/MultisetMedian.hpp"
 #include "../include/SlidingCovariance.hpp"
 #include "../include/SlidingMean.hpp"
+#include "../include/SlidingMedian.hpp"
 #include "../include/SlidingMoments.hpp"
 #include "../include/SlidingMomentsPrefix.hpp"
 #include "../include/SlidingWelfordRing.hpp"
+#include "../include/TwoHeapMedian.hpp"
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -99,8 +102,24 @@ PYBIND11_MODULE(robust_rolling_core, m) {
           },
           py::arg("input"), py::arg("min_periods") = 0);
 
+  py::class_<FlatMedian>(m, "FlatMedian")
+      .def(py::init<std::size_t>(), py::arg("window_size"))
+      .def("update", &FlatMedian::update)
+      .def("get_median", &FlatMedian::get_median)
+      .def(
+          "process_batch",
+          [](FlatMedian &self,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 input,
+             std::size_t min_periods) {
+            return process_batch_generic(
+                self, input, [](FlatMedian &m) { return m.get_median(); },
+                min_periods);
+          },
+          py::arg("input"), py::arg("min_periods") = 0);
+
   py::class_<MultisetMedian>(m, "MultisetMedian")
-      .def(py::init<std::size_t>())
+      .def(py::init<std::size_t>(), py::arg("window_size"))
       .def("update", &MultisetMedian::update)
       .def("get_median", &MultisetMedian::get_median)
       .def(
@@ -111,6 +130,39 @@ PYBIND11_MODULE(robust_rolling_core, m) {
              std::size_t min_periods) {
             return process_batch_generic(
                 self, input, [](MultisetMedian &m) { return m.get_median(); },
+                min_periods);
+          },
+          py::arg("input"), py::arg("min_periods") = 0);
+
+  py::class_<TwoHeapMedian>(m, "TwoHeapMedian")
+      .def(py::init<std::size_t>(), py::arg("window_size"))
+      .def("update", &TwoHeapMedian::update)
+      .def("get_median", &TwoHeapMedian::get_median)
+      .def(
+          "process_batch",
+          [](TwoHeapMedian &self,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 input,
+             std::size_t min_periods) {
+            return process_batch_generic(
+                self, input, [](TwoHeapMedian &m) { return m.get_median(); },
+                min_periods);
+          },
+          py::arg("input"), py::arg("min_periods") = 0);
+
+  py::class_<SlidingMedian>(m, "SlidingMedian")
+      .def(py::init<std::size_t, bool>(), py::arg("window_size"),
+           py::arg("expect_nan") = false)
+      .def("update", &SlidingMedian::update)
+      .def("get_median", &SlidingMedian::get_median)
+      .def(
+          "process_batch",
+          [](SlidingMedian &self,
+             py::array_t<double, py::array::c_style | py::array::forcecast>
+                 input,
+             std::size_t min_periods) {
+            return process_batch_generic(
+                self, input, [](SlidingMedian &m) { return m.get_median(); },
                 min_periods);
           },
           py::arg("input"), py::arg("min_periods") = 0);

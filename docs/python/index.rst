@@ -4,13 +4,13 @@ robustrolling
 .. raw:: html
 
    <p class="hero">
-   High-performance rolling-window statistics for R and Python — six
+   High-performance rolling-window statistics for R and Python — eleven
    algorithms implemented in C++17, exposed through idiomatic bindings in
-   both languages, with O(1) or O(log n) updates per element.
+   both languages, with O(1) or O(log w) updates per element.
    </p>
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: API Reference
 
    api
@@ -21,18 +21,28 @@ Algorithm overview
 
 .. list-table::
    :header-rows: 1
-   :widths: 26 22 12 20 20
+   :widths: 26 26 12 18 18
 
    * - C++ class
      - Algorithm
      - Complexity
      - R function(s)
-     - Python function(s)
+     - Python class / function(s)
+   * - ``SlidingMean``
+     - Prefix sum + SIMD
+     - O(n) batch
+     - ``rolling_mean``
+     - ``rolling_mean``, ``SlidingMean``
    * - ``SlidingWelfordRing``
      - Welford online variance (ring buffer)
      - O(1)
-     - ``rolling_variance``
+     - ``rolling_variance`` (``method="stable"``)
      - ``rolling_variance``, ``SlidingWelford``
+   * - ``SlidingMomentsPrefix``
+     - Prefix sums of raw moments
+     - O(n) batch
+     - ``rolling_variance/skewness/kurtosis`` (``method="fast"``)
+     - ``SlidingMomentsPrefix``
    * - ``MonotonicMax``
      - Monotonic deque maximum
      - O(1) amortised
@@ -43,16 +53,31 @@ Algorithm overview
      - O(1) amortised
      - ``rolling_min``
      - ``rolling_min``, ``MonotonicMin``
+   * - ``SlidingMedian``
+     - Auto-dispatches to one of three below
+     - —
+     - ``rolling_median`` (``expect_nan=``)
+     - ``rolling_median``, ``SlidingMedian``
+   * - ``FlatMedian``
+     - Sorted ``std::vector`` + binary search
+     - O(w) insert
+     - —
+     - ``FlatMedian``
    * - ``MultisetMedian``
-     - ``std::multiset`` tracked-iterator median
-     - O(log n)
-     - ``rolling_median``
-     - ``rolling_median``, ``MultisetMedian``
+     - ``std::multiset`` + tracked iterator
+     - O(log w)
+     - —
+     - ``MultisetMedian``
+   * - ``TwoHeapMedian``
+     - Two heaps + lazy deletion
+     - O(log w)
+     - —
+     - ``TwoHeapMedian``
    * - ``SlidingMoments``
      - Terriberry 4th-moment online algorithm
      - O(1)
-     - ``rolling_mean``, ``rolling_skewness``, ``rolling_kurtosis``
-     - ``rolling_mean``, ``rolling_skewness``, ``rolling_kurtosis``, ``SlidingMoments``
+     - ``rolling_skewness``, ``rolling_kurtosis`` (``method="stable"``)
+     - ``rolling_skewness``, ``rolling_kurtosis``, ``SlidingMoments``
    * - ``SlidingCovariance``
      - 2-D Welford online covariance
      - O(1)
@@ -63,8 +88,7 @@ Performance
 -----------
 
 Benchmarked on Apple M-series (ARM), window = 100, n = 1 000 000
-(median of 10 runs). Best robustrolling configuration shown
-(¹ ``assume_finite=True``, ² ``method="fast"``).
+(median of 10 runs).
 
 **Python vs pandas**
 
@@ -115,6 +139,9 @@ Benchmarked on Apple M-series (ARM), window = 100, n = 1 000 000
 
 **Python vs Polars**
 
+``rolling_median`` uses ``FlatMedian`` at window ≤ 600; ``TwoHeapMedian``
+wins at large windows where Polars' fixed O(w) algorithm loses ground.
+
 .. list-table::
    :header-rows: 1
    :widths: 28 18 14 12
@@ -136,9 +163,9 @@ Benchmarked on Apple M-series (ARM), window = 100, n = 1 000 000
      - 11.6 ms
      - 1.1x
    * - ``rolling_median``
-     - 106 ms
-     - 40.8 ms
-     - 0.4x
+     - 55 ms
+     - 41 ms
+     - 0.7x (w=100)
    * - ``rolling_variance``
      - 15.7 ms
      - 16.2 ms
@@ -254,7 +281,7 @@ Install for R
 
 .. code-block:: r
 
-   # Requires a C++17 compiler (GCC ≥ 7, Clang ≥ 5, MSVC ≥ 2017)
+   # Requires R ≥ 4.0 and a C++17 compiler
    install.packages("remotes")
    remotes::install_github("IgorPtak/rolling_window")
 
@@ -263,7 +290,7 @@ Install for Python
 
 .. code-block:: bash
 
-   # Requires Python ≥ 3.8 and a C++17 compiler
+   # Requires Python ≥ 3.10 and a C++17 compiler
    pip install git+https://github.com/IgorPtak/rolling_window.git#subdirectory=py_package
 
    # Or clone and install locally:

@@ -1,4 +1,4 @@
-.PHONY: r-doc r-build r-test r-all py-build py-test py-all all
+.PHONY: r-doc r-build r-test r-all py-build py-test py-all docs all
 
 r-doc:
 	Rscript -e "devtools::document()"
@@ -22,5 +22,9 @@ py-test:
 	.venv/bin/pytest py_package/tests/ -v --tb=short
 
 py-all: py-build py-test
+
+docs:
+	py_package/venv/bin/python -m sphinx -b html docs/python docs/_build/python
+	@echo "Docs built"
 
 all: r-all py-all

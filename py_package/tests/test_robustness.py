@@ -1,4 +1,4 @@
-"""Memory layout, dtype, and fuzz tests — cross-cutting robustness."""
+"""Memory layout, dtype, and fuzz tests - cross-cutting robustness."""
 import numpy as np
 import pandas as pd
 import pytest
@@ -8,8 +8,8 @@ import robustrolling as rr
 
 from conftest import nan_allclose
 
-_ENGINE_CLASSES = [rrc.MonotonicMax, rrc.MonotonicMin, rrc.MultisetMedian, rrc.SlidingWelford]
-_ENGINE_IDS = ["MonotonicMax", "MonotonicMin", "MultisetMedian", "SlidingWelford"]
+_ENGINE_CLASSES = [rrc.MonotonicMax, rrc.MonotonicMin, rrc.SlidingMedian, rrc.SlidingWelford]
+_ENGINE_IDS = ["MonotonicMax", "MonotonicMin", "SlidingMedian", "SlidingWelford"]
 
 _SIMPLE_FNS = [rr.rolling_max, rr.rolling_min, rr.rolling_median, rr.rolling_variance, rr.rolling_mean]
 _SIMPLE_IDS = ["max", "min", "median", "variance", "mean"]
@@ -108,4 +108,4 @@ class TestFuzz:
     def test_stress_many_instances_no_crash(self):
         x = np.random.randn(100).astype(np.float64)
         for _ in range(2000):
-            rrc.MultisetMedian(10).process_batch(x)
+            rrc.SlidingMedian(10).process_batch(x)

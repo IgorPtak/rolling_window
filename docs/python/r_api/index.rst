@@ -107,14 +107,34 @@ parameter compatible with *pandas* semantics.
 
 ----
 
-.. function:: rolling_median(x, window_size, min_periods = window_size)
+.. function:: rolling_median(x, window_size, min_periods = window_size, expect_nan = FALSE)
 
-   *Rolling Median* — Computes the rolling median over a numeric vector using an ordered multiset
-   with a tracked median iterator. Time complexity: O(log n) per element.
+   *Rolling Median* — Automatically selects the fastest algorithm based on
+   window size and expected NaN density.
+
+   Dispatch rules (windows > 2 000 always use ``TwoHeapMedian``):
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 20 25 55
+
+      * - ``expect_nan``
+        - w ≤ 600
+        - 601–2 000
+      * - ``FALSE``
+        - ``FlatMedian``
+        - ``MultisetMedian``
+      * - ``TRUE``
+        - ``FlatMedian``
+        - ``FlatMedian`` (601–1 500) / ``TwoHeapMedian`` (1 501–2 000)
 
    :param x: A numeric vector of type double.
    :param window_size: Positive integer window length.
-   :param min_periods: Minimum number of non-``NA`` observations required in a window to return a result. Defaults to ``window_size``.
+   :param min_periods: Minimum number of non-``NA`` observations required in
+      a window to return a result. Defaults to ``window_size``.
+   :param expect_nan: Logical. If ``TRUE``, switches dispatch thresholds to
+      NaN-robust paths to avoid ``MultisetMedian``'s O(n) iterator-shift
+      degradation on NaN-heavy streams. Defaults to ``FALSE``.
    :returns: A numeric vector with rolling median values.
 
    .. rubric:: Example
@@ -123,6 +143,9 @@ parameter compatible with *pandas* semantics.
 
       x <- as.double(c(1, 3, 2, 5, 4))
       rolling_median(x, 3L)
+
+      # NaN-heavy data — use expect_nan = TRUE for large windows
+      rolling_median(x, 1000L, expect_nan = TRUE)
 
 
 ----
