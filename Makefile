@@ -1,4 +1,4 @@
-.PHONY: r-doc r-build r-test r-all py-build py-test py-all docs all
+.PHONY: r-doc r-build r-test r-check r-all py-build py-test py-all docs all
 
 r-doc:
 	Rscript -e "devtools::document()"
@@ -12,6 +12,10 @@ r-build: r-sync-headers r-doc
 
 r-test:
 	Rscript -e "tinytest::test_package('robustrolling')"
+
+r-check: r-sync-headers r-doc
+	R CMD build .
+	R CMD check --as-cran robustrolling_*.tar.gz
 
 r-all: r-build r-test
 
