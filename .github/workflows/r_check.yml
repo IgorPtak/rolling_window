@@ -35,13 +35,15 @@ jobs:
       - name: Sync headers
         run: make r-sync-headers
 
+      - uses: r-lib/actions/setup-tinytex@v2
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::rcmdcheck, any::tinytest
 
       - uses: r-lib/actions/check-r-package@v2
         with:
-          args: 'c("--as-cran")'
+          args: 'c("--as-cran", "--no-manual")'
           error-on: '"error"'
 
   test-full:
@@ -67,5 +69,5 @@ jobs:
 
       - uses: r-lib/actions/check-r-package@v2
         with:
-          args: 'c("--as-cran")'
+          args: 'c("--as-cran", "--no-manual")'
           error-on: '"error"'

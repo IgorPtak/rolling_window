@@ -6,3 +6,11 @@
 ^\.clang-format$
 ^robustrolling_.*\.tar\.gz$
 ^LICENSE\.md$
+^\.venv$
+^py_package$
+^src_core$
+^\.Rcheck$
+^robustrolling\.Rcheck$
+^src/.*\.o$
+^src/.*\.so$
+^src/.*\.dylib$

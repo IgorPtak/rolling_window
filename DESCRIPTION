@@ -5,6 +5,8 @@ Version: 1.0.0
 Authors@R: person("Igor", "Ptak",
     email = "ptakigor2005@gmail.com",
     role = c("aut", "cre"))
+Author: Igor Ptak [aut, cre]
+Maintainer: Igor Ptak <ptakigor2005@gmail.com>
 Description: High-performance rolling window metrics implemented in C++17.
     Provides numerically stable, O(1) algorithms for variance, mean, skewness,
     kurtosis, covariance, Pearson correlation, maximum, minimum, and median,
