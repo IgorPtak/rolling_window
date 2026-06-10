@@ -16,10 +16,10 @@ for header in "$src_dir"/*.hpp; do
 done
 
 mkdir -p "$core_dest_dir"
-rm -f "$core_dest_dir"/MonotonicMax.cpp "$core_dest_dir"/MultisetMedian.cpp \
-  "$core_dest_dir"/SlidingWelford.cpp "$core_dest_dir"/SlidingWelfordRing.cpp
 
-for source in "$core_src_dir"/*.cpp; do
-  [ -e "$source" ] || continue
-  cp "$source" "$core_dest_dir"/
-done
+if [ -d "$core_src_dir" ]; then
+  for source in "$core_src_dir"/*.cpp; do
+    [ -e "$source" ] || continue
+    cp "$source" "$core_dest_dir"/
+  done
+fi

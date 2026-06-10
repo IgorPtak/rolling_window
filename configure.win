@@ -5,4 +5,6 @@ mkdir -p inst/include
 cp include/*.hpp inst/include/
 
 mkdir -p src
-cp src_core/*.cpp src/
+if [ -d src_core ]; then
+  cp src_core/*.cpp src/
+fi
