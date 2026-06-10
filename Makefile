@@ -6,6 +6,7 @@ r-doc:
 r-sync-headers:
 	mkdir -p inst/include
 	cp include/*.hpp inst/include/
+	cp src_core/*.cpp src/
 
 r-build: r-sync-headers r-doc
 	R CMD INSTALL .

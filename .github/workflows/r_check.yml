@@ -60,8 +60,10 @@ jobs:
         with:
           r-version: "release"
 
-      - name: Sync headers
+      - name: Sync headers and sources
         run: make r-sync-headers
+
+      - uses: r-lib/actions/setup-tinytex@v2
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
