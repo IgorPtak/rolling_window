@@ -4,7 +4,13 @@
 [![C++ tests](https://github.com/IgorPtak/rolling_window/actions/workflows/cpp_test.yml/badge.svg)](https://github.com/IgorPtak/rolling_window/actions/workflows/cpp_test.yml)
 [![Python package](https://github.com/IgorPtak/rolling_window/actions/workflows/python.yml/badge.svg)](https://github.com/IgorPtak/rolling_window/actions/workflows/python.yml)
 
-High-performance rolling window metrics for R and Python, implemented in C++17.
+Rolling window metrics for R and Python, implemented in C++17.
+
+> **Scope.** This started as a university project on building libraries in
+> C++ with R and Python bindings. The goal was to see how close a from-scratch
+> implementation can get to established libraries (pandas, Polars, slider,
+> RcppRoll), not to replace them. The benchmarks below include the cases where
+> it is slower. The project is not under active development.
 
 ---
 
@@ -13,13 +19,18 @@ High-performance rolling window metrics for R and Python, implemented in C++17.
 `robustrolling` provides numerically stable, memory-efficient rolling window
 algorithms built in C++17 and exposed to both R and Python. All algorithms:
 
-- run in **O(1) time per element** (O(log w) for median),
+- run in **O(1) time per element** (median: O(log w) for `MultisetMedian` and
+  `TwoHeapMedian`, O(w) memmove for `FlatMedian`, which is fastest for small
+  windows),
 - handle **NaN / NA transparently**,
 - support a **`min_periods`** parameter (pandas-compatible semantics),
-- share a common **CRTP base** (`RollingMetric<Derived>`) — zero virtual
-  dispatch, flat ring-buffer memory layout,
-- are compiled with **`-O3 -flto`** and include **ARM NEON / AVX2 SIMD** paths
-  for `rolling_mean`.
+- share a common **CRTP base** (`RollingMetric<Derived>`) with no virtual
+  dispatch; the moment-based metrics (mean, Welford, Terriberry, covariance)
+  use a flat ring buffer,
+- use an **ARM NEON** path for `rolling_mean` (on x86 the scalar path is used;
+  there is no AVX2 implementation). Build flags: the Python wheel is built with
+  `-O3 -flto -march=native`, the C++ CMake targets with `-O3`, and the R package
+  with R's default flags.
 
 ---
 
@@ -27,7 +38,7 @@ algorithms built in C++17 and exposed to both R and Python. All algorithms:
 
 | C++ class              | Algorithm                             | Time           | R API                                                    | Python class           |
 | ---------------------- | ------------------------------------- | -------------- | -------------------------------------------------------- | ---------------------- |
-| `SlidingMean`          | Prefix sum + SIMD (ARM NEON / AVX2)   | O(n) batch     | `rolling_mean()`                                         | `SlidingMean`          |
+| `SlidingMean`          | Prefix sum + ARM NEON (post-scan)     | O(n) batch     | `rolling_mean()`                                         | `SlidingMean`          |
 | `SlidingWelfordRing`   | Welford online + ring buffer          | O(1)           | `rolling_variance()` (`method="stable"`)                 | `SlidingWelford`       |
 | `SlidingMomentsPrefix` | Prefix sums of raw moments            | O(n) batch     | `rolling_variance/skewness/kurtosis()` (`method="fast"`) | `SlidingMomentsPrefix` |
 | `MonotonicMax`         | Monotonic deque                       | O(1) amortised | `rolling_max()`                                          | `MonotonicMax`         |
@@ -167,9 +178,12 @@ rolling_max(x, 3L, min_periods = 1L)
 **Fast methods — prefix-sum acceleration**
 
 `method = "fast"` uses prefix sums of raw moments instead of the online
-Welford/Terriberry algorithm. It is 2–4x faster on large arrays but
-susceptible to catastrophic cancellation for very large values with small
-variance. Use it when numerical precision is not critical.
+Welford/Terriberry algorithm. It is 1.4–4x faster on large arrays (variance
+and mean about 4x, skewness 1.4x, kurtosis 1.9x) but susceptible to
+catastrophic cancellation for very large values with small variance. In a
+quick check with N(0,1) noise on top of a constant offset of 1e9, the relative
+error of the fast variance was of the order of 1e6, versus about 1e-5 for the
+stable method. Use `"fast"` only when numerical precision is not critical.
 
 ```r
 rolling_variance(y, 3L, method = "fast")
@@ -241,7 +255,7 @@ rr.rolling_cor(a, b, 3)
 **Fast methods**
 
 ```python
-# 2–4x faster, less numerically stable
+# 1.4–4x faster, less numerically stable
 rr.rolling_variance(y, 3, method="fast")
 rr.rolling_skewness(y, 3, method="fast")
 rr.rolling_kurtosis(y, 4, method="fast")
@@ -376,7 +390,7 @@ common interface across all algorithm classes without virtual dispatch:
 
 ```
 RollingMetric<Derived>
-├── SlidingMean          — prefix sum + ARM NEON / AVX2 SIMD
+├── SlidingMean          — prefix sum + ARM NEON (scalar on x86)
 ├── MonotonicMax         — monotonic deque (max)
 ├── MonotonicMin         — monotonic deque (min)
 ├── FlatMedian           — sorted vector + binary search  (best: w ≤ 600)
@@ -439,6 +453,27 @@ Rscript benchmarks/bench_r.R
 python benchmarks/bench_python.py   # vs pandas + stable/fast + median sweep
 python benchmarks/bench_polars.py   # vs Polars + median sweep vs Polars
 ```
+
+---
+
+## Known limitations
+
+- **Sliding Welford does not forget past magnitude.** Removing elements from the
+  running statistics accumulates rounding error. After a burst of very large
+  values the error does not decay (in one test the variance stayed about 28x too
+  high for a million steps). A periodic exact recomputation from the ring
+  buffer would fix this and has not been implemented.
+- **`update(NaN)` in the streaming API** is not guarded for `SlidingWelfordRing`
+  (the batch functions skip NaN correctly). Use the batch API or filter NaN
+  before calling `update`.
+- **`TwoHeapMedian` memory** grows with the length of the stream, not with the
+  window size, because lazily deleted elements stay in the heaps until they
+  reach the top (about 190 MB after 4 million updates with a window of 1000).
+  `FlatMedian` and `MultisetMedian` use constant memory.
+- **SIMD** is implemented for ARM NEON only. On x86 a plain running-sum loop
+  is about as fast as the prefix-sum implementation.
+- **Benchmarks** were run on Apple M-series. Comparisons against `slider` and
+  `RcppRoll` mostly reflect how slow those baselines are.
 
 ---
 
